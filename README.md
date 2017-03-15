@@ -3,8 +3,8 @@ An toolkit made for visualizing some task in developing [Atmos renderer](https:/
 
 Some tool had been part of library [Misc](https://github.com/BentleyBlanks/Misc).
 
-Tool | Function
+Tool | Task
 ---- |----
-Distribution | 
-ShapeSample | 
-BRDF |
+Distribution | Tesing inverse CDF method in 1d, 2d distribution.
+ShapeSample | Testing the method of Sampling on different shapes.
+BSDF | Visualize the distribution of different BSDFs.
