@@ -7,16 +7,23 @@
 #include <algorithm>
 #include <functional>
 #include <vector>
+#include "a3Log.h"
 
 Triangle triangle;
 
-void loadModel(std::vector<Triangle*>& triangles, const aiScene* scene)
+bool loadModel(std::vector<Triangle*>& triangles, const aiScene* scene)
 {
     if(!scene)
-        return;
+    {
+        a3Log::error("找不到场景aiScene\n");
+        return false;
+    }
 
     if(scene->mNumMeshes < 0)
-        return;
+    {
+        a3Log::error("场景网格数量过低: %d\n", scene->mNumMeshes);
+        return false;
+    }
 
     for(int m = 0; m < scene->mNumMeshes; m++)
     {
@@ -26,7 +33,10 @@ void loadModel(std::vector<Triangle*>& triangles, const aiScene* scene)
         {
             int numIndices = mesh->mFaces[i].mNumIndices;
             if(numIndices != 3)
-                return;
+            {
+                a3Log::error("图元顶点个数不支持: %d\n", numIndices);
+                return false;
+            }
 
             Triangle* triangle = new Triangle();
 
@@ -42,42 +52,81 @@ void loadModel(std::vector<Triangle*>& triangles, const aiScene* scene)
             triangles.push_back(triangle);
         }
     }
+
+    return true;
 }
 
 bool sortPoints(const ofVec3f & m1, const ofVec3f & m2)
 {
-    ofVec3f xDir(1, 0, 0);
+    ofVec3f xDir(-1, 0, 0);
     ofVec3f cross1 = xDir.crossed(m1.getNormalized());
     ofVec3f cross2 = xDir.crossed(m2.getNormalized());
 
-    if(cross1.z > 0 && cross2.z < 0)
+    if(cross1.z >= 0)
     {
-        return true;
-    }
-    else if(cross2.z > 0 && cross1.z < 0)
-    {
-        return false;
-    }
-    else if(cross1.z > 0 && cross2.z > 0)
-    {
-        float cos1 = m1.getNormalized().dot(xDir);
-        float cos2 = m2.getNormalized().dot(xDir);
-
-        if(cos1 > cos2)
+        if(cross2.z < 0)
+        {
             return true;
+        }
+        else if(cross2.z > 0)
+        {
+            float cos1 = m1.getNormalized().dot(xDir);
+            float cos2 = m2.getNormalized().dot(xDir);
+
+            if(cos1 > cos2)
+                return true;
+            else
+                return false;
+        }
         else
             return false;
     }
     else
     {
-        float cos1 = m1.getNormalized().dot(xDir);
-        float cos2 = m2.getNormalized().dot(xDir);
+        if(cross2.z < 0)
+        {
+            float cos1 = m1.getNormalized().dot(xDir);
+            float cos2 = m2.getNormalized().dot(xDir);
 
-        if(cos1 > cos2)
+            if(cos1 >= cos2)
+                return false;
+            else
+                return true;
+        }
+        else if(cross2.z > 0)
             return false;
         else
             return true;
     }
+
+    //if(cross1.z > 0 && cross2.z < 0)
+    //{
+    //    return true;
+    //}
+    //else if(cross2.z > 0 && cross1.z < 0)
+    //{
+    //    return false;
+    //}
+    //else if(cross1.z > 0 && cross2.z > 0)
+    //{
+    //    float cos1 = m1.getNormalized().dot(xDir);
+    //    float cos2 = m2.getNormalized().dot(xDir);
+
+    //    if(cos1 > cos2)
+    //        return true;
+    //    else
+    //        return false;
+    //}
+    //else
+    //{
+    //    float cos1 = m1.getNormalized().dot(xDir);
+    //    float cos2 = m2.getNormalized().dot(xDir);
+
+    //    if(cos1 > cos2)
+    //        return false;
+    //    else
+    //        return true;
+    //}
 }
 
 Shape::Shape()
@@ -85,7 +134,18 @@ Shape::Shape()
     triangle.set(ofVec3f(10, 0, 0), ofVec3f(200, 500, 0), ofVec3f(-500, 0, 0), ofVec3f(200, -500, 0));
 }
 
-void Shape::load(const char * path)
+Shape::~Shape()
+{
+    for(auto t : triangles)
+    {
+        delete t;
+        t = NULL;
+    }
+
+    triangles.clear();
+}
+
+bool Shape::load(const char * path)
 {
     // models
     if(model.loadModel(path))
@@ -93,11 +153,12 @@ void Shape::load(const char * path)
         model.setPosition(0, 0, 0);
 
         // triangles
-        loadModel(triangles, model.getAssimpScene());
+        return loadModel(triangles, model.getAssimpScene());
     }
     else
     {
-        printf("找不到模型%s", path);
+        a3Log::error("找不到模型%s\n", path);
+        return false;
     }
 }
 

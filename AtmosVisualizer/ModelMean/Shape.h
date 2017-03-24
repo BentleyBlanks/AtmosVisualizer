@@ -8,8 +8,9 @@ class Shape
 {
 public:
     Shape();
+    ~Shape();
 
-    void load(const char* path);
+    bool load(const char* path);
 
     // 获取已排序点序列
     std::vector<ofVec3f>* getPointsWithZ(float z);

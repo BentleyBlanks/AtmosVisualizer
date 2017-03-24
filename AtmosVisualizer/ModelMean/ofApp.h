@@ -28,16 +28,17 @@ public:
     void gotMessage(ofMessage msg);
 
     void loadModels();
-    std::vector<ofVec3f>* updateMean(const std::vector<ofVec3f>* mean, const std::vector<ofVec3f>* ps2, float z);
+    std::vector<ofVec3f>* updateMean(const std::vector<ofVec3f>* mean, const std::vector<ofVec3f>* ps2, float z, float weight);
 
     ofxImGui::Gui gui;
 
 
+    std::vector<std::vector<ofVec3f>*> mean;
     std::vector<ofPolyline> meanFace;
-    ofPolyline meanPoly;
+    //ofPolyline meanPoly;
     // 一一对应
-    std::vector<ofVec3f> points;
-    std::vector<ofPolyline*> polylines;
+    //std::vector<ofVec3f> points;
+    //std::vector<ofPolyline*> polylines;
     //std::vector<std::vector<ofVec3f>> points;
 
     //std::vector<std::vector<Triangle*>> shapes;
@@ -46,10 +47,15 @@ public:
     ofEasyCam* cam;
     //Triangle triangle;
 
-    std::vector<Shape*> shapes;
+    //std::vector<Shape*> shapes;
 
     bool drawPolylines, drawMean, drawFace;
 
     float z, zInterval;
     int rayCount;
+    int modelNum;
+
+    string prefix, saveFileName;
+    //std::vector<ofVec3f> test;
+    //std::vector<ofVec3f> rays;
 };
