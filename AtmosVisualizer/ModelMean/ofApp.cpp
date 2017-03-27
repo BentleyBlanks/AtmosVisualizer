@@ -31,6 +31,8 @@ void ofApp::setup(){
     //loadModel("cs015.obj");
     //loadModel("xa001.obj");
 
+    printf("%f\n", ofHexToFloat("4060000000000000"));
+
     cam = new ofEasyCam();
 
     gui.setup();
@@ -38,6 +40,7 @@ void ofApp::setup(){
     rayCount = 360;
     modelNum = 4;
     zInterval = 5;
+
     //triangle.set(ofVec3f(10, 0, 0), ofVec3f(200, 500, 0), ofVec3f(-500, 0, 0), ofVec3f(200, -500, 0));
 }
 
@@ -201,6 +204,15 @@ void ofApp::draw(){
     ImGui::DragInt("Ray Count", &rayCount, 720, 1, 3600);
     ImGui::DragInt("Model Count", &modelNum, 1, 1, 300);
 
+    if(ImGui::Button("Set Title"))
+    {
+        ofSetWindowTitle("Whosyourdadyy?");
+    }
+
+    if(ImGui::Button("Toggle Fullscreen"))
+    {
+        ofToggleFullscreen();
+    }
     //ImGui::Checkbox("Draw Polyline", &drawPolylines);
 
     //ImGui::Checkbox("Draw Mean", &drawMean);
@@ -261,7 +273,7 @@ void ofApp::draw(){
                     a3Log::success("已加载模型:%s \n", path.c_str());
 
                 float start = -120, zStart = start, zEnd = 120;
-                
+
                 // 第一次导入模型初始化mean
                 if(mean.empty())
                 {
@@ -289,7 +301,7 @@ void ofApp::draw(){
                     }
                     else
                     {
-                        std::vector<ofVec3f>* temp = updateMean(mean[j], points, zStart, (float) (i - 1 ) / (float)i);
+                        std::vector<ofVec3f>* temp = updateMean(mean[j], points, zStart, (float) (i - 1) / (float) i);
 
                         // 释放上一次平均结果
                         delete mean[j];
@@ -319,7 +331,11 @@ void ofApp::draw(){
                     meanFace.push_back(poly);
                 }
             }
+
+            a3Log::success("平均计算结束\n");
         }
+        else
+            a3Log::warning("导入模型数量不得少于0\n");
     }
 
 
