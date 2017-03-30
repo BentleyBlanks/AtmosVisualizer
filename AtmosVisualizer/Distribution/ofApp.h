@@ -31,8 +31,16 @@ public:
 
     void setupSampling1D();
     void setupSampling2D();
+    void setupSamplingHemisphere();
+    void setupSamplingSphere();
+    void setupSamplingCone();
+
     void drawSampling1D();
     void drawSampling2D();
+    void drawSamplingHemisphere();
+    void drawSamplingUniformHemisphere();
+    void drawSamplingSphere();
+    void drawSamplingCone();
 
     // 1D
     a3Distribution1D *distribution1D;
@@ -58,4 +66,15 @@ public:
     // 3D
     ofEasyCam cam;
     Graph3D *graph;
+
+    // Hemisphere
+    vector<ofVec3f> hemiPoints1, hemiPoints2, hemiUniPoints, spherePoints;
+    int hemiPointNum, spherePointNum;
+    int hemiSampleType;
+    float hemiRadius, sphereRadius;
+
+    // Cone
+    vector<ofVec3f> conePoints;
+    int conePointNum;
+    float coneRadius, cosThetaMax;
 };
