@@ -10,3 +10,4 @@ ShapeSample | Testing the method of Sampling on different shapes.
 BSDF | Visualize the distribution of different BSDFs.
 ModelMean | Calculating the mean of many face models.
 Sample | Visualizing different 2D sampling methods.
+MessageQueue | For tesing this program communication with another process.
