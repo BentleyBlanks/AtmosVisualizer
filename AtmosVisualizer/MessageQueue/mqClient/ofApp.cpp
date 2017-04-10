@@ -22,6 +22,15 @@ public:
     int key;
 };
 
+struct msgExit :public a3MessageEntryHead
+{
+public:
+    msgExit()
+    {
+        type = 2;
+    }
+};
+
 //--------------------------------------------------------------
 void ofApp::setup(){
     // 最大消息数量 单消息最大占字节
@@ -41,13 +50,23 @@ void ofApp::draw(){
 }
 
 //--------------------------------------------------------------
+void ofApp::exit()
+{
+    if(!mq.isFull())
+    {
+        msgExit msg;
+        mq.enqueue(msg);
+    }
+}
+
+//--------------------------------------------------------------
 void ofApp::keyPressed(int key){
 
 }
 
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key){
-    //if(!mq.isFull())
+    if(!mq.isFull())
     {
         msgKeyboard msg;
         msg.key = key;
@@ -57,7 +76,7 @@ void ofApp::keyReleased(int key){
 
 //--------------------------------------------------------------
 void ofApp::mouseMoved(int x, int y ){
-    //if(!mq.isFull())
+    if(!mq.isFull())
     {
         msgMouse msg;
         msg.x = x;
