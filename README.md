@@ -1,7 +1,9 @@
 # AtmosVisualizer
 An toolkit made for visualizing some task in developing [Atmos renderer](https://github.com/BentleyBlanks/Atmos) whitch testing on Console seems not easy enough. It is developed on Openframeworks. 
 
-Some tool had been part of library [Misc](https://github.com/BentleyBlanks/Misc).
+The **most excited feature** was process communication between C++ and Node.js. Including communications between broswer(Chrome, CEF, Electron, ...) and native program written in C++(Openframeworks, ...). 
+
+Some tool had been part of library [Misc](https://github.com/BentleyBlanks/Misc). 
 
 Tool | Task
 ---- |----
@@ -10,4 +12,4 @@ ShapeSample | Testing the method of Sampling on different shapes.
 BSDF | Visualize the distribution of different BSDFs.
 ModelMean | Calculating the mean of many face models.
 Sample | Visualizing different 2D sampling methods.
-MessageQueue | Process communication based on shared memory both C++ and Node.js. Supporting communicating between broswer(Chrome, CEF, Electron...) and native program written in C++;
+MessageQueue | Process communication based on shared memory both C++ and Node.js.
