@@ -412,6 +412,9 @@ namespace ofxImGui
 	{
 		// Build texture atlas
 		ImGuiIO& io = ImGui::GetIO();
+
+        io.Fonts->AddFontFromFileTTF("./data/msyhl.ttc", 19, NULL, io.Fonts->GetGlyphRangesChinese());
+
 		unsigned char* pixels;
 		int width, height;
 		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   // Load as RGBA 32-bits for OpenGL3 demo because it is more likely to be compatible with user's existing shader.
