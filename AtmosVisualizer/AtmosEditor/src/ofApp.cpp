@@ -4,31 +4,27 @@
 
 #define A3_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
 
+static int styleID = 0;
+#define IMGUI_STYLE_BEGIN(style)    static int tempStyleID = styleID++;\
+                                    ImGui::PushID(tempStyleID);\
+                                    ImGui::PushStyleColor(ImGuiCol_Button, ImColor::HSV(style / 7.0f, 0.6f, 0.6f));\
+                                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImColor::HSV(style / 7.0f, 0.7f, 0.7f));\
+                                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImColor::HSV(style / 7.0f, 0.8f, 0.8f));
+
+#define IMGUI_STYLE_END()           ImGui::PopStyleColor(3); \
+                                    ImGui::PopID();
+
+#define IMGUI_BUTTON_DELETE_BEGIN(name)     IMGUI_STYLE_BEGIN(0);\
+                                            if(ImGui::Button(generateLabel("Delete", name).c_str())){
+
+#define IMGUI_BUTTON_DELETE_END()           }IMGUI_STYLE_END();
+
 string generateLabel(string name, string anonymous)
 {
     string label = name;
     label += "##";
     label += anonymous;
     return label;
-}
-
-string getShapeTypeName(a3ShapeType type)
-{
-    switch(type)
-    {
-    case SPHERE:
-        return "Sphere";
-    case DISK:
-        return "Disk";
-    case PLANE:
-        return "Plane";
-    case TRIANGLE:
-        return "Triangle";
-    case INFINITE_PLANE:
-        return "Infinite Plane";
-    default:
-        return "Unknown Shape Type";
-    }
 }
 
 // 左手坐标系
@@ -64,7 +60,7 @@ void ofApp::setup()
     gui.setup();
     
     freeCamPreview = true;
-    freeCam.lookAt(freeCam.getLookAtDir(), ofVec3f(0, -1, 0));
+    freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, -1, 0));
 
     activeCameraIndex = -1;
 
@@ -117,6 +113,9 @@ void ofApp::draw()
     for(auto s : shapeList)
         s->draw();
         
+    for(auto l : lightList)
+        l->draw();
+
     // -----------------------------------cam end-----------------------------------
     getActiveCamera()->end();
 
@@ -200,15 +199,15 @@ void ofApp::modelWindow()
         {
             if(ImGui::TreeNode((*it)->name.c_str()))
             {
-                if(ImGui::Button("Delete"))
-                {
+                IMGUI_BUTTON_DELETE_BEGIN("Models" + (*it)->name)
                     a3ModelData* temp = *it;
 
                     it = modelList.erase(it);
                     continued = false;
 
                     A3_SAFE_DELETE(temp);
-                }
+                IMGUI_BUTTON_DELETE_END()
+
                 ImGui::TreePop();
             }
 
@@ -275,7 +274,7 @@ void ofApp::shapeWindow()
 
                 switch(s->type)
                 {
-                case SPHERE:
+                case A3_SHAPETYPE_SPHERE:
                 {
                     if(ImGui::DragFloat(generateLabel("Radius", s->name).c_str(), &s->radius))
                         s->sphere->setRadius(s->radius);
@@ -285,22 +284,21 @@ void ofApp::shapeWindow()
 
                     break;
                 }
-                case DISK:
+                case A3_SHAPETYPE_DISK:
                     break;
-                case PLANE:
+                case A3_SHAPETYPE_PLANE:
                     break;
-                case TRIANGLE:
+                case A3_SHAPETYPE_TRIANGLE:
                     break;
-                case INFINITE_PLANE:
+                case A3_SHAPETYPE_INFINITE_PLANE:
                     break;
                 }
 
-                if(ImGui::Button(generateLabel("Delete", "Shape").c_str()))
-                {
+                IMGUI_BUTTON_DELETE_BEGIN("Shape" + s->name)
                     it = shapeList.erase(it);
                     continued = false;
                     A3_SAFE_DELETE(s);
-                }
+                IMGUI_BUTTON_DELETE_END()
 
                 ImGui::TreePop();
             }
@@ -323,17 +321,17 @@ void ofApp::shapeWindow()
                 data->name = "Shape" + ofToString(shapeList.size());
                 switch(data->type)
                 {
-                case SPHERE:
+                case A3_SHAPETYPE_SPHERE:
                     data->sphere = new ofSpherePrimitive();
                     break;
-                case DISK:
+                case A3_SHAPETYPE_DISK:
                     break;
-                case PLANE:
+                case A3_SHAPETYPE_PLANE:
                     data->plane = new ofPlanePrimitive();
                     break;
-                case TRIANGLE:
+                case A3_SHAPETYPE_TRIANGLE:
                     break;
-                case INFINITE_PLANE:
+                case A3_SHAPETYPE_INFINITE_PLANE:
                     break;
                 }
 
@@ -357,6 +355,122 @@ void ofApp::lightWindow()
     if(openLightWindow)
     {
         ImGui::Begin("Lights");
+
+        for(vector<a3LightData*>::iterator it = lightList.begin(); it != lightList.end();)
+        {
+            bool continued = true;
+
+            a3LightData* l = *it;
+            if(ImGui::TreeNode(l->name.c_str()))
+            {
+                ImGui::TextWrapped(getLightTypeName(l->type).c_str());
+
+                switch(l->type)
+                {
+                case A3_LIGHTTYPE_POINT:
+                {
+                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
+                    ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), &l->position[0]);
+
+                    break;
+                }
+                case A3_LIGHTTYPE_AREA:
+                {
+                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
+                    break;
+                }
+                case A3_LIGHTTYPE_INFINITE_AREA:
+                {
+                    IMGUI_STYLE_BEGIN(2);
+                    if(ImGui::Button(generateLabel("Load Image", l->name).c_str()))
+                    {
+                        ofFileDialogResult result = ofSystemLoadDialog("Load Image");
+                        if(result.bSuccess)
+                        {
+                            // OF纹理render target是GL_TEXTURE_RECTANGLE_ARB。ImGui需要的是GL_TEXTURE_2D
+                            ofDisableArbTex();
+                            l->image.load(result.filePath); 
+                            ofEnableArbTex();
+                        }
+                    }
+                    IMGUI_STYLE_END();
+
+                    if(l->image.isAllocated())
+                    {
+                        ImGui::TextWrapped(("Path: " + l->imagePath).c_str());
+                        float ratio = l->image.getWidth() / l->image.getHeight();
+                        float w = ImGui::GetContentRegionAvailWidth();
+                        GLuint a = l->image.getTexture().getTextureData().textureID;
+                        l->image.update();
+                        ImGui::Image((ImTextureID) (uintptr_t) a, ImVec2(w, w / ratio));
+                        //ImGui::Image((ImTextureID) (uintptr_t) l->imageIDi qu, ImVec2(w, w / ratio));
+                        //l->image.bind();
+                        //GLuint b = 6;
+                        //ImGui::Image((ImTextureID) (uintptr_t)b, ImVec2(w, w / ratio));
+                        //ImGui::ImageButton((ImTextureID) (uintptr_t) l->imageID, ImVec2(w, w / ratio));
+                        //ImGui::ImageButton((ImTextureID) (uintptr_t) a, ImVec2(w, w / ratio));
+                        //l->image.unbind();
+                    }
+
+                    break;
+                }
+                case A3_LIGHTTYPE_SPOT:
+                {
+                    // all light needs emmission settings
+                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
+
+                    if(ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), &l->position[0]))
+                        l->updatePosition();
+
+                    ImGui::DragFloat3(generateLabel("Direction", l->name).c_str(), &l->direction[0]);
+
+                    ImGui::DragFloat(generateLabel("Cone Angle", l->name).c_str(), &l->coneAngle);
+
+                    ImGui::DragFloat(generateLabel("Falloff Start", l->name).c_str(), &l->falloffStart);
+
+                    // display
+                    ImGui::DragFloat(generateLabel("Cone Height", l->name).c_str(), &l->coneHeight);
+
+                    break;
+                }
+                default:
+                    break;
+                }
+
+                IMGUI_BUTTON_DELETE_BEGIN("Light" + l->name)
+                    it = lightList.erase(it);
+                    continued = false;
+                    A3_SAFE_DELETE(l);
+                IMGUI_BUTTON_DELETE_END()
+
+                ImGui::TreePop();
+            }
+
+            if(continued) it++;
+        }
+
+        if(ImGui::Button(generateLabel("+", "Light").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+            ImGui::OpenPopup("Add Light");
+        if(ImGui::BeginPopupModal("Add Light", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            static int item = 0;
+            ImGui::Combo(generateLabel("Type", "Light").c_str(), &item, "Point Light\0Area Light\0Infinite Area Light\0Spot Light\0");
+
+            if(ImGui::Button(generateLabel("Ok", "Light").c_str(), ImVec2(120, 0)))
+            {
+                a3LightData* data = new a3LightData();
+                data->type = (a3LightType) item;
+                data->name = "Light" + ofToString(lightList.size());
+                
+                lightList.push_back(data);
+
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::SameLine();
+            if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+            ImGui::EndPopup();
+        }
 
         ImGui::End();
     }
@@ -472,8 +586,7 @@ void ofApp::cameraWindow()
                 // 视锥体距离
                 ImGui::DragFloat(generateLabel("Distance", (*it)->name).c_str(), &(*it)->distance);
 
-                if(ImGui::Button(generateLabel("Delete", "Camera").c_str()))
-                {
+                IMGUI_BUTTON_DELETE_BEGIN("Camera" + (*it)->name)
                     a3CameraData* temp = *it;
 
                     it = cameraList.erase(it);
@@ -482,7 +595,7 @@ void ofApp::cameraWindow()
                     continued = false;
 
                     A3_SAFE_DELETE(temp);
-                }
+                IMGUI_BUTTON_DELETE_END()
 
                 ImGui::TreePop();
             }
@@ -655,139 +768,4 @@ void ofApp::gotMessage(ofMessage msg)
 void ofApp::dragEvent(ofDragInfo dragInfo)
 {
 
-}
-
-a3CameraData::a3CameraData(ofCamera * cam, string name)
-    :camera(cam), name(name)
-{
-    active = false;
-    fov = 40.0f;
-
-    distance = 100;
-
-    origin.set(0, 0, 0);
-    up.set(0, 1, 0);
-    lookAt.set(0, 0, -1);
-
-    dimension.set(1920, 1080);
-
-    cam->setAspectRatio(dimension[0] / dimension[1]);
-    cam->setPosition(origin);
-    cam->lookAt(lookAt, up);
-    cam->setFov(fov);
-}
-
-a3CameraData::~a3CameraData()
-{
-    A3_SAFE_DELETE(camera);
-}
-
-void a3CameraData::draw()
-{
-    ofPushStyle();
-
-    // 本体
-    camera->transformGL();
-
-    ofPushMatrix();
-    if(active)
-        ofSetColor(20, 210, 20);
-    else
-        ofSetColor(255);
-
-    ofScale(1, 1, 1);
-    ofNode().draw();
-    ofPopMatrix();
-
-    camera->restoreTransformGL();
-
-    // 视锥体中心点
-    ofVec3f p = camera->getPosition() + distance * camera->getLookAtDir();
-
-    // 宽高
-    float aspectRatio = dimension[0] / dimension[1];
-    float t0 = distance * tanf(ofDegToRad(camera->getFov() * aspectRatio / 2.0f));
-    float t1 = t0 / aspectRatio;
-
-    // 上右
-    ofVec3f a0 = camera->getUpDir() * t1,
-        a1 = camera->getSideDir() * t0;
-
-    ofVec3f p0 = p + a1 + a0, 
-        p1 = p + a1 - a0,
-        p2 = p - a1 - a0,
-        p3 = p - a1 + a0;
-
-    ofVec3f o = camera->getPosition();
-
-    ofSetColor(220);
-    ofLine(o, p0);
-    ofLine(o, p1);
-    ofLine(o, p2);
-    ofLine(o, p3);
-
-    ofLine(p0, p1);
-    ofLine(p1, p2);
-    ofLine(p2, p3);
-    ofLine(p3, p0);
-
-    ofPopStyle();
-}
-
-a3ModelData::~a3ModelData()
-{
-    A3_SAFE_DELETE(model);
-}
-
-void a3ModelData::draw()
-{
-    ofPushStyle();
-    model->drawWireframe();
-    ofPopStyle();
-}
-
-a3ShapeData::a3ShapeData()
-{ 
-    type = SPHERE; 
-
-    radius = 10.0f;
-
-    position.set(0, 0, 0);
-    normal.set(0, 1, 0);
-
-    name = "Shape";
-
-    sphere = NULL;
-    plane = NULL;
-}
-
-a3ShapeData::~a3ShapeData()
-{
-    A3_SAFE_DELETE(sphere);
-    A3_SAFE_DELETE(plane);
-}
-
-void a3ShapeData::draw()
-{
-    //ofPushStyle();
-    switch(type)
-    {
-    case SPHERE:
-        //ofSetColor(180, 180, 50);
-        sphere->drawWireframe();
-        break;
-    case DISK:
-        break;
-    case PLANE:
-        plane->drawWireframe();
-        break;
-    case TRIANGLE:
-        break;
-    case INFINITE_PLANE:
-        break;
-    default:
-        a3Log::warning("Shape Type not allowed\n");
-        break;
-    }
-    //ofPopStyle();
 }

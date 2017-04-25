@@ -3,79 +3,7 @@
 #include "ofMain.h"
 #include "DrawUtils.h"
 #include "ofxImGui.h"
-#include "ofxAssimpModelLoader.h"
-
-enum a3ShapeType
-{
-    SPHERE = 0,
-    DISK,
-    PLANE,
-    TRIANGLE,
-    INFINITE_PLANE,
-};
-
-struct a3ShapeData
-{
-    a3ShapeData();
-    ~a3ShapeData();
-
-    void draw();
-
-    string name;
-    a3ShapeType type;
-
-    // sphere disk
-    float radius;
-
-    // common
-    ofVec3f position;
-
-    // disk plane infinite_plane
-    ofVec3f normal;
-
-    // plane
-    float width, height;
-
-    ofSpherePrimitive* sphere;
-    ofPlanePrimitive* plane;
-};
-
-struct a3ModelData
-{
-    a3ModelData(ofxAssimpModelLoader* loader, string path, string name)
-        :model(loader), path(path), name(name) {}
-    ~a3ModelData();
-
-    void draw();
-
-    ofxAssimpModelLoader* model;
-    string path;
-    string name;
-};
-
-struct a3CameraData
-{
-    a3CameraData(ofCamera* cam, string name);
-    ~a3CameraData();
-
-    void draw();
-
-    ofCamera* camera;
-    //ofEasyCam* camera;
-    string name;
-
-    ofVec3f origin;
-    ofVec3f lookAt;
-    ofVec3f up;
-
-    float fov;
-    // width height
-    ofVec2f dimension;
-
-    float distance;
-    bool lockMouseInput;
-    bool active;
-};
+#include "a3TypeData.h"
 
 class ofApp : public ofBaseApp
 {
@@ -122,6 +50,9 @@ public:
     Graph3D* ground;
   
     ofEasyCam freeCam;
+
+    // light
+    vector<a3LightData*> lightList;
 
     // models
     vector<a3ModelData*> modelList;
