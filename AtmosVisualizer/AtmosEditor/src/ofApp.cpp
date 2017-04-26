@@ -1,6 +1,12 @@
 ﻿#include "ofApp.h"
 #include "log/a3Log.h"
 #include "log/a3Settings.h"
+#include "messageQueue/a3Message.h"
+#include "messageQueue/a3MessageQueueIPC.h"
+#include <ShellAPI.h>
+
+const int msgMaxNum = 100;
+const int msgMaxSize = sizeof(a3C2SGridBufferMessage);
 
 #define A3_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
 
@@ -19,12 +25,48 @@ static int styleID = 0;
 
 #define IMGUI_BUTTON_DELETE_END()           }IMGUI_STYLE_END();
 
+#ifdef _DEBUG
+#define ATMOS_EXE_PATH L"D:\\Download\\Program\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe"
+#else
+#define ATMOS_EXE_PATH L"D:\\Download\\Program\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe"
+#endif
+
+string getWindowToggleName(string windowName, bool windowOpened)
+{
+    string name;
+
+    if(windowOpened)
+        name = "Close ";
+    else
+        name = "Open";
+
+    name += windowName;
+    name += " Window";
+
+    return name;
+}
+
 string generateLabel(string name, string anonymous)
 {
     string label = name;
     label += "##";
     label += anonymous;
     return label;
+}
+
+string getPreviewModeName(a3PreviewType type)
+{
+    switch(type)
+    {
+    case A3_PREVIEW_REALTIME:
+        return "RealTime Preview";
+    case A3_PREVIEW_LOCAL:
+        return "Local Preview";
+    case A3_PREVIEW_IPC:
+        return "IPC Preview";
+    default:
+        return "Unknown Type";
+    }
 }
 
 // 左手坐标系
@@ -56,9 +98,10 @@ void a3DrawAxis(float axisLength)
 void ofApp::setup()
 {
     ofEnableDepthTest();
+    ofSetFrameRate(60);
 
     gui.setup();
-    
+
     freeCamPreview = true;
     freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, -1, 0));
 
@@ -66,26 +109,97 @@ void ofApp::setup()
 
     // preview 
     ground = new Graph3D(650, 650, 30, 30);
+    ipcS2C.init(L"Who's Your Daddy S2C", true, 50, 512);
+    ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, msgMaxSize);
 
-    logo.loadImage("./logo.png");
-    logoButtonID = gui.loadImage(logo);
-
+    // window
     openCameraWindow = true;
     openShapeWindow = true;
     openViewWindow = true;
     openLightWindow = true;
     openModelWindow = true;
+    openRendererWindow = true;
     openAboutWindow = false;
+
+    // about window
+    ofDisableArbTex();
+    logo.loadImage("./logo.png");
+    ofEnableArbTex();
+    //logoButtonID = gui.loadImage(logo);
+    logoButtonID = logo.getTexture().getTextureData().textureID;
+
+    // renderer
+    spp = 16;
+    enableGammaCorrection = true;
+    enableToneMapping = false;
+    gridLevel[0] = 16;
+    gridLevel[1] = 16;
 }
 
 //--------------------------------------------------------------
 void ofApp::update()
 {
+    // update the message queue
+    updateMQ();
+}
 
+//--------------------------------------------------------------
+void ofApp::updateMQ()
+{
+    // check the message queue
+    if(!ipcC2S.isEmpty())
+    {
+        char msg_buffer[msgMaxSize];
+        memset(msg_buffer, 0, msgMaxSize);
+
+        a3MessageEntryHead* pMsg = (a3MessageEntryHead*) msg_buffer;
+        while(ipcC2S.dequeue(*pMsg))
+        {
+            switch(pMsg->type)
+            {
+            case A3_C2S_MSG_GRIDIMAGE:
+            {
+                const a3C2SGridBufferMessage* msg = (const a3C2SGridBufferMessage*) pMsg;
+
+                a3Log::success("Message Grid[%d] Buffer Recieved\n", msg->currentIndex);
+
+                ofFloatPixels pixels;
+                pixels.setFromPixels(msg->buffer, msg->gridWidth, msg->gridHeight, OF_IMAGE_COLOR);
+                ofFloatImage img(pixels);
+
+                ipcFbo.begin(); 
+                img.draw(msg->gridX, msg->gridY);
+                ipcFbo.end();
+                break;
+            }
+            case A3_C2S_MSG_LIGHTPATH:
+                break;
+            }
+        }
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::draw()
+{
+    switch(previewType)
+    {
+    case A3_PREVIEW_REALTIME:
+        realtimePreview();
+        break;
+    case A3_PREVIEW_LOCAL:
+        localPreview();
+        break;
+    case A3_PREVIEW_IPC:
+        ipcPreview();
+        break;
+    }
+
+    guiDraw();
+}
+
+//--------------------------------------------------------------
+void ofApp::realtimePreview()
 {
     ofBackground(65, 65, 85);
 
@@ -112,14 +226,27 @@ void ofApp::draw()
 
     for(auto s : shapeList)
         s->draw();
-        
+
     for(auto l : lightList)
         l->draw();
 
     // -----------------------------------cam end-----------------------------------
     getActiveCamera()->end();
+}
 
-    guiDraw();
+//--------------------------------------------------------------
+void ofApp::localPreview()
+{
+    //ofBackground(85, 65, 65);
+    //ofDrawBitmapString("Local Preview", ofPoint(ofGetWindowWidth() / 2.0f, ofGetWindowHeight() / 2.0f));
+}
+
+//--------------------------------------------------------------
+void ofApp::ipcPreview()
+{
+    //ofBackground(65, 85, 65);
+    //ofDrawBitmapString("IPC Preview", ofPoint(ofGetWindowWidth() / 2.0f, ofGetWindowHeight() / 2.0f));
+    ipcFbo.draw(ofGetWidth() / 2 - ipcFbo.getWidth() / 2, ofGetHeight() / 2 - ipcFbo.getHeight() / 2);
 }
 
 //--------------------------------------------------------------
@@ -145,7 +272,53 @@ void ofApp::guiDraw()
 
             if(ImGui::MenuItem("Render IPC", NULL))
             {
+                a3Log::info("Start IPC Rendering\n");
 
+                SHELLEXECUTEINFO shell = {sizeof(shell)};
+                shell.fMask = SEE_MASK_FLAG_DDEWAIT;
+                shell.lpVerb = L"open";
+                shell.lpFile = ATMOS_EXE_PATH;
+                shell.nShow = SW_SHOWNORMAL;
+                BOOL ret = ShellExecuteEx(&shell);
+                if(ret == TRUE)
+                {
+                    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+                    {
+                        a3CameraData* data = cameraList[activeCameraIndex];
+
+                        if(ipcFbo.isAllocated())
+                            ipcFbo.clear();
+
+                        // init the grid preview fbo
+                        ipcFbo.allocate(data->dimension.x, data->dimension.y, GL_RGBA);
+                        ipcFbo.begin();
+                        ofClear(255, 255, 255);
+                        ipcFbo.end();
+
+                        // send init msg
+                        a3S2CInitMessage* msg = new a3S2CInitMessage();
+                        // renderer
+                        msg->imageWidth = data->dimension.x;
+                        msg->imageHeight = data->dimension.y;
+                        msg->enableToneMapping = enableToneMapping;
+                        msg->enableGammaCorrection = enableGammaCorrection;
+                        msg->levelX = gridLevel[0];
+                        msg->levelY = gridLevel[1];
+                        msg->spp = spp;
+
+                        // models
+                        // shapes
+                        // lights
+                        // camera
+
+                        ipcS2C.enqueue(*msg);
+                        delete msg;
+                    }
+                    else
+                        a3Log::warning("IPC Render needs a camera to be actived\n");
+                }
+                else
+                    a3Log::warning("Atmos core exe opened error\n");
             }
 
             ImGui::EndMenu();
@@ -153,15 +326,17 @@ void ofApp::guiDraw()
 
         if(ImGui::BeginMenu("Window"))
         {
-            if(ImGui::MenuItem("Shape Window", NULL)) { openShapeWindow = !openShapeWindow; }
+            if(ImGui::MenuItem(getWindowToggleName("Shape", openShapeWindow).c_str(), NULL)) { openShapeWindow = !openShapeWindow; }
 
-            if(ImGui::MenuItem("Light Window", NULL)) { openLightWindow = !openLightWindow; }
+            if(ImGui::MenuItem(getWindowToggleName("Light", openLightWindow).c_str(), NULL)) { openLightWindow = !openLightWindow; }
 
-            if(ImGui::MenuItem("Model Window", NULL)) { openModelWindow = !openModelWindow; }
+            if(ImGui::MenuItem(getWindowToggleName("Model", openModelWindow).c_str(), NULL)) { openModelWindow = !openModelWindow; }
 
-            if(ImGui::MenuItem("View Window", NULL)) { openViewWindow = !openViewWindow; }
+            if(ImGui::MenuItem(getWindowToggleName("View", openViewWindow).c_str(), NULL)) { openViewWindow = !openViewWindow; }
 
-            if(ImGui::MenuItem("Camera Window", NULL)) { openCameraWindow = !openCameraWindow; }
+            if(ImGui::MenuItem(getWindowToggleName("Camera", openCameraWindow).c_str(), NULL)) { openCameraWindow = !openCameraWindow; }
+
+            if(ImGui::MenuItem(getWindowToggleName("Renderer", openRendererWindow).c_str(), NULL)) { openRendererWindow = !openRendererWindow; }
 
             ImGui::EndMenu();
         }
@@ -181,6 +356,7 @@ void ofApp::guiDraw()
     cameraWindow();
     lightWindow();
     shapeWindow();
+    rendererWindow();
 
     aboutWindow();
 
@@ -483,6 +659,7 @@ void ofApp::viewWindow()
     {
         ImGui::Begin("Views");
 
+        ImGui::TextWrapped("Preview Mode: %s", getPreviewModeName(previewType).c_str());
         ImGui::TextWrapped("FPS:%.2f", ofGetFrameRate());
 
         if(ImGui::TreeNode("Preview Camera"))
@@ -502,6 +679,17 @@ void ofApp::viewWindow()
             ImGui::TreePop();
         }
 
+        if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+            previewType = A3_PREVIEW_REALTIME;
+        //ImGui::SameLine();
+
+        if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+            previewType = A3_PREVIEW_LOCAL;
+        //ImGui::SameLine();
+
+        if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+            previewType = A3_PREVIEW_IPC;
+        
         ImGui::End();
     }
 }
@@ -669,6 +857,21 @@ void ofApp::cameraWindow()
 
         ImGui::End();
     }
+}
+
+//--------------------------------------------------------------
+void ofApp::rendererWindow()
+{
+    if(!openRendererWindow) return;
+
+    ImGui::Begin("Renderer");
+
+    ImGui::DragInt2("Grid Level", gridLevel, 1, 1, 500);
+    ImGui::DragInt("Spp", &spp, 1, 1, 10000);
+    ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
+    ImGui::Checkbox("Enable Tone Mapping", &enableToneMapping);
+
+    ImGui::End();
 }
 
 //--------------------------------------------------------------

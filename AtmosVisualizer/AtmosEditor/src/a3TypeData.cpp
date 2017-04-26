@@ -13,7 +13,7 @@ a3CameraData::a3CameraData(ofCamera * cam, string name)
     up.set(0, -1, 0);
     lookAt.set(0, 0, 1);
 
-    dimension.set(1920, 1080);
+    dimension.set(768, 768);
 
     cam->setAspectRatio(dimension[0] / dimension[1]);
     cam->setPosition(origin);
