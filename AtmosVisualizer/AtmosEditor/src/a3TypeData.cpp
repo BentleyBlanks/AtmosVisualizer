@@ -1,7 +1,7 @@
 #include "a3TypeData.h"
 #include "log/a3Log.h"
 
-a3CameraData::a3CameraData(ofCamera * cam, string name)
+a3EditorCameraData::a3EditorCameraData(ofCamera * cam, string name)
     :camera(cam), name(name)
 {
     active = false;
@@ -21,12 +21,12 @@ a3CameraData::a3CameraData(ofCamera * cam, string name)
     cam->setFov(fov);
 }
 
-a3CameraData::~a3CameraData()
+a3EditorCameraData::~a3EditorCameraData()
 {
     A3_SAFE_DELETE(camera);
 }
 
-void a3CameraData::draw()
+void a3EditorCameraData::draw()
 {
     ofPushStyle();
 
@@ -78,21 +78,21 @@ void a3CameraData::draw()
     ofPopStyle();
 }
 
-a3ModelData::~a3ModelData()
+a3EditorModelData::~a3EditorModelData()
 {
     A3_SAFE_DELETE(model);
 }
 
-void a3ModelData::draw()
+void a3EditorModelData::draw()
 {
     ofPushStyle();
     model->drawWireframe();
     ofPopStyle();
 }
 
-a3ShapeData::a3ShapeData()
+a3EditorShapeData::a3EditorShapeData()
 {
-    type = A3_SHAPETYPE_SPHERE;
+    type = A3_SHAPE_SPHERE;
 
     radius = 10.0f;
 
@@ -105,29 +105,29 @@ a3ShapeData::a3ShapeData()
     plane = NULL;
 }
 
-a3ShapeData::~a3ShapeData()
+a3EditorShapeData::~a3EditorShapeData()
 {
     A3_SAFE_DELETE(sphere);
     A3_SAFE_DELETE(plane);
 }
 
-void a3ShapeData::draw()
+void a3EditorShapeData::draw()
 {
     //ofPushStyle();
     switch(type)
     {
-    case A3_SHAPETYPE_SPHERE:
+    case A3_SHAPE_SPHERE:
         //ofSetColor(180, 180, 50);
         sphere->drawWireframe();
         break;
-    case A3_SHAPETYPE_DISK:
+    case A3_SHAPE_DISK:
         break;
-    case A3_SHAPETYPE_PLANE:
+    case A3_SHAPE_PLANE:
         plane->drawWireframe();
         break;
-    case A3_SHAPETYPE_TRIANGLE:
+    case A3_SHAPE_TRIANGLE:
         break;
-    case A3_SHAPETYPE_INFINITE_PLANE:
+    case A3_SHAPE_INFINITE_PLANE:
         break;
     default:
         a3Log::warning("Shape Type not allowed\n");
@@ -136,9 +136,9 @@ void a3ShapeData::draw()
     //ofPopStyle();
 }
 
-a3LightData::a3LightData()
+a3EditorLightData::a3EditorLightData()
 {
-    type = A3_LIGHTTYPE_POINT;
+    type = A3_LIGHT_POINT;
 
     //cone = new ofConePrimitive();
     //cone->setResolutionHeight(1); 
@@ -156,13 +156,13 @@ a3LightData::a3LightData()
     //updatePosition();
 }
 
-a3LightData::~a3LightData()
+a3EditorLightData::~a3EditorLightData()
 {
 }
 
-void a3LightData::updatePosition()
+void a3EditorLightData::updatePosition()
 {
-    //if(type == A3_LIGHTTYPE_SPOT)
+    //if(type == A3_LIGHT_SPOT)
     //    cone->setPosition(position + direction * coneHeight * 0.5f);
 
     node->setPosition(position);
@@ -170,7 +170,7 @@ void a3LightData::updatePosition()
 
 //void a3LightData::updateCone()
 //{
-//    //if(type == A3_LIGHTTYPE_SPOT)
+//    //if(type == A3_LIGHT_SPOT)
 //    //{
 //    //    cone->set(tanf(coneAngle) * coneHeight, coneHeight);
 //    //    updatePosition();
@@ -178,19 +178,19 @@ void a3LightData::updatePosition()
 //    //}
 //}
 
-void a3LightData::draw()
+void a3EditorLightData::draw()
 {
     switch(type)
     {
-    case A3_LIGHTTYPE_POINT:
-    case A3_LIGHTTYPE_AREA:
+    case A3_LIGHT_POINT:
+    case A3_LIGHT_AREA:
     {
         drawNode();
         break;
     }
-    case A3_LIGHTTYPE_INFINITE_AREA:
+    case A3_LIGHT_INFINITE_AREA:
         break;
-    case A3_LIGHTTYPE_SPOT:
+    case A3_LIGHT_SPOT:
     {
         drawNode();
 
@@ -206,7 +206,7 @@ void a3LightData::draw()
     }
 }
 
-void a3LightData::drawNode()
+void a3EditorLightData::drawNode()
 {
     node->transformGL();
     node->draw();
@@ -217,15 +217,15 @@ string getShapeTypeName(a3ShapeType type)
 {
     switch(type)
     {
-    case A3_SHAPETYPE_SPHERE:
+    case A3_SHAPE_SPHERE:
         return "Sphere";
-    case A3_SHAPETYPE_DISK:
+    case A3_SHAPE_DISK:
         return "Disk";
-    case A3_SHAPETYPE_PLANE:
+    case A3_SHAPE_PLANE:
         return "Plane";
-    case A3_SHAPETYPE_TRIANGLE:
+    case A3_SHAPE_TRIANGLE:
         return "Triangle";
-    case A3_SHAPETYPE_INFINITE_PLANE:
+    case A3_SHAPE_INFINITE_PLANE:
         return "Infinite Plane";
     default:
         return "Unknown Shape Type";
@@ -236,15 +236,15 @@ string getLightTypeName(a3LightType type)
 {
     switch(type)
     {
-    case A3_LIGHTTYPE_POINT:
+    case A3_LIGHT_POINT:
         return "Point Light";
-    case A3_LIGHTTYPE_AREA:
+    case A3_LIGHT_AREA:
         return "Area Light";
-    case A3_LIGHTTYPE_INFINITE_AREA:
+    case A3_LIGHT_INFINITE_AREA:
         return "Infinite Light";
-    case A3_LIGHTTYPE_SPOT:
+    case A3_LIGHT_SPOT:
         return "Spot Light";
     default:
-        break;
+        return "Unknow Light Type";
     }
 }

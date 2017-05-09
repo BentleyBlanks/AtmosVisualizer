@@ -73,6 +73,9 @@
     <ClCompile Include="src\log\a3Log.cpp">
       <Filter>src\log</Filter>
     </ClCompile>
+    <ClCompile Include="src\a3TypeData.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
@@ -319,6 +322,12 @@
     </ClInclude>
     <ClInclude Include="src\log\a3Settings.h">
       <Filter>src\log</Filter>
+    </ClInclude>
+    <ClInclude Include="src\a3TypeData.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\a3EditorUtils.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

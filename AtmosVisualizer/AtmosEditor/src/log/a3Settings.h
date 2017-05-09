@@ -46,6 +46,7 @@
 #endif
 
 #include <iostream>
+#include <sstream>
 // 实现cout << string 不包含则报错
 #include <string>
 #include <vector>
@@ -56,16 +57,37 @@
 #include <assert.h>
 #include <math.h>
 
-#define A3_SAFE_DELETE(pointer) if(pointer)\
-{\
-    delete pointer;\
-    pointer = NULL;\
+// --!deprecated
+//#define A3_SAFE_DELETE(pointer) if(pointer)\
+//{\
+//    delete pointer;\
+//    pointer = NULL;\
+//}
+
+//#define A3_SAFE_DELETE_1DARRAY(pointer) if(pointer)\
+//{\
+//    delete[] pointer;\
+//    pointer = NULL;\
+//}
+
+template<typename T>
+void A3_SAFE_DELETE(T*& a)
+{
+    if(a)
+    {
+        delete a;
+        a = NULL;
+    }
 }
 
-#define A3_SAFE_DELETE_1DARRAY(pointer) if(pointer)\
-{\
-    delete[] pointer;\
-    pointer = NULL;\
+template<typename T>
+void A3_SAFE_DELETE_1DARRAY(T*& pointer)
+{
+    if(pointer)
+    {
+        delete[] pointer;
+        pointer = NULL;
+    }
 }
 
 // ------------------------Assert------------------------
@@ -175,6 +197,9 @@
 // ------------------------Image------------------------
 #define A3_IMAGE_CHECKERBOARD_LEVEL 22
 
+#define A3_IMAGE_DEFAULT_WIDTH 100
+#define A3_IMAGE_DEFAULT_HEIGHT 100
+
 //#define A3_IMAGE_LIB_PNGPP
 #define A3_IMAGE_LIB_LODEPNG
 #define A3_IMAGE_LIB_TINYEXR
@@ -202,8 +227,8 @@ struct a3Version
 
     std::string get();
 
-    void print();	
-    
+    void print();
+
     int major;		// significant changes
 
     int minor;		// incremental changes

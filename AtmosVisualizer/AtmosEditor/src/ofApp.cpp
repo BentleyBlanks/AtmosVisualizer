@@ -3,6 +3,7 @@
 #include "log/a3Settings.h"
 #include "messageQueue/a3Message.h"
 #include "messageQueue/a3MessageQueueIPC.h"
+#include "a3EditorUtils.h"
 #include <ShellAPI.h>
 
 const int msgMaxNum = 100;
@@ -26,9 +27,9 @@ static int styleID = 0;
 #define IMGUI_BUTTON_DELETE_END()           }IMGUI_STYLE_END();
 
 #ifdef _DEBUG
-#define ATMOS_EXE_PATH L"D:\\Download\\Program\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe"
-#else
-#define ATMOS_EXE_PATH L"D:\\Download\\Program\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe"
+//static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe";
+//#else
+static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe";
 #endif
 
 string getWindowToggleName(string windowName, bool windowOpened)
@@ -69,31 +70,6 @@ string getPreviewModeName(a3PreviewType type)
     }
 }
 
-// 左手坐标系
-void a3DrawAxis(float axisLength)
-{
-    // axis
-    ofPushStyle();
-
-    ofVec3f x(axisLength, 0, 0), y(0, -axisLength, 0), z(0, 0, axisLength);
-
-    ofSetColor(ofColor::red);
-    ofLine(ofPoint(), x);
-
-    ofSetColor(ofColor::green);
-    ofLine(ofPoint(), y);
-
-    ofSetColor(ofColor::blue);
-    ofLine(ofPoint(), z);
-
-    ofPopStyle();
-
-    // axis name
-    ofDrawBitmapString("x", x);
-    ofDrawBitmapString("y", y);
-    ofDrawBitmapString("z", z);
-}
-
 //--------------------------------------------------------------
 void ofApp::setup()
 {
@@ -109,8 +85,9 @@ void ofApp::setup()
 
     // preview 
     ground = new Graph3D(650, 650, 30, 30);
-    ipcS2C.init(L"Who's Your Daddy S2C", true, 50, 512);
+    ipcS2C.init(L"Who's Your Daddy S2C", true, 50, 2048);
     ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, msgMaxSize);
+    fullScreenIPCPreview = false;
 
     // window
     openCameraWindow = true;
@@ -246,7 +223,10 @@ void ofApp::ipcPreview()
 {
     //ofBackground(65, 85, 65);
     //ofDrawBitmapString("IPC Preview", ofPoint(ofGetWindowWidth() / 2.0f, ofGetWindowHeight() / 2.0f));
-    ipcFbo.draw(ofGetWidth() / 2 - ipcFbo.getWidth() / 2, ofGetHeight() / 2 - ipcFbo.getHeight() / 2);
+    if(!fullScreenIPCPreview)
+        ipcFbo.draw(ofGetWidth() / 2 - ipcFbo.getWidth() / 2, ofGetHeight() / 2 - ipcFbo.getHeight() / 2);
+    else
+        ipcFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
 }
 
 //--------------------------------------------------------------
@@ -277,48 +257,24 @@ void ofApp::guiDraw()
                 SHELLEXECUTEINFO shell = {sizeof(shell)};
                 shell.fMask = SEE_MASK_FLAG_DDEWAIT;
                 shell.lpVerb = L"open";
-                shell.lpFile = ATMOS_EXE_PATH;
+                shell.lpFile = atmosEXEPath.c_str();
                 shell.nShow = SW_SHOWNORMAL;
                 BOOL ret = ShellExecuteEx(&shell);
                 if(ret == TRUE)
                 {
-                    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
-                    {
-                        a3CameraData* data = cameraList[activeCameraIndex];
-
-                        if(ipcFbo.isAllocated())
-                            ipcFbo.clear();
-
-                        // init the grid preview fbo
-                        ipcFbo.allocate(data->dimension.x, data->dimension.y, GL_RGBA);
-                        ipcFbo.begin();
-                        ofClear(255, 255, 255);
-                        ipcFbo.end();
-
-                        // send init msg
-                        a3S2CInitMessage* msg = new a3S2CInitMessage();
-                        // renderer
-                        msg->imageWidth = data->dimension.x;
-                        msg->imageHeight = data->dimension.y;
-                        msg->enableToneMapping = enableToneMapping;
-                        msg->enableGammaCorrection = enableGammaCorrection;
-                        msg->levelX = gridLevel[0];
-                        msg->levelY = gridLevel[1];
-                        msg->spp = spp;
-
-                        // models
-                        // shapes
-                        // lights
-                        // camera
-
-                        ipcS2C.enqueue(*msg);
-                        delete msg;
-                    }
-                    else
-                        a3Log::warning("IPC Render needs a camera to be actived\n");
+                    sendInitMessage();
                 }
                 else
-                    a3Log::warning("Atmos core exe opened error\n");
+                {
+                    a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
+
+                    ofFileDialogResult result = ofSystemLoadDialog("Select Atmos exe");
+                    if(result.bSuccess)
+                    {
+                        atmosEXEPath = a3S2WS(result.filePath);
+                        a3Log::debug("Atmos exe path: %s\n", result.filePath.c_str());
+                    }
+                }
             }
 
             ImGui::EndMenu();
@@ -363,6 +319,47 @@ void ofApp::guiDraw()
     gui.end();
 }
 
+void ofApp::sendInitMessage()
+{
+    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+    {
+        a3EditorCameraData* data = cameraList[activeCameraIndex];
+
+        if(ipcFbo.isAllocated())
+            ipcFbo.clear();
+
+        // init the grid preview fbo
+        ipcFbo.allocate(data->dimension.x, data->dimension.y, GL_RGBA);
+        ipcFbo.begin();
+        ofClear(255, 255, 255);
+        ipcFbo.end();
+
+        // send init msg
+        a3S2CInitMessage* msg = new a3S2CInitMessage();
+        // renderer
+        msg->imageWidth = data->dimension.x;
+        msg->imageHeight = data->dimension.y;
+        msg->enableToneMapping = enableToneMapping;
+        msg->enableGammaCorrection = enableGammaCorrection;
+        msg->levelX = gridLevel[0];
+        msg->levelY = gridLevel[1];
+        msg->spp = spp;
+
+        // models
+        // shapes
+        // lights
+        // camera
+        if(!ipcS2C.isFull())
+            ipcS2C.enqueue(*msg);
+        else
+            a3Log::warning("Full Message Queue\n");
+
+        delete msg;
+    }
+    else
+        a3Log::warning("IPC Render needs a camera to be actived\n");
+}
+
 //--------------------------------------------------------------
 void ofApp::modelWindow()
 {
@@ -371,12 +368,12 @@ void ofApp::modelWindow()
         ImGui::Begin("Models");
 
         bool continued = true;
-        for(vector<a3ModelData*>::iterator it = modelList.begin(); it != modelList.end();)
+        for(vector<a3EditorModelData*>::iterator it = modelList.begin(); it != modelList.end();)
         {
             if(ImGui::TreeNode((*it)->name.c_str()))
             {
                 IMGUI_BUTTON_DELETE_BEGIN("Models" + (*it)->name)
-                    a3ModelData* temp = *it;
+                    a3EditorModelData* temp = *it;
 
                     it = modelList.erase(it);
                     continued = false;
@@ -411,7 +408,7 @@ void ofApp::modelWindow()
                     if(!find)
                     {
                         a3Log::success("Successfully loded model:%s\n", result.filePath.c_str());
-                        a3ModelData* data = new a3ModelData(loader, result.filePath, result.fileName);
+                        a3EditorModelData* data = new a3EditorModelData(loader, result.filePath, result.fileName);
                         modelList.push_back(data);
                     }
                     else
@@ -439,18 +436,18 @@ void ofApp::shapeWindow()
     {
         ImGui::Begin("Shapes");
 
-        for(vector<a3ShapeData*>::iterator it = shapeList.begin(); it != shapeList.end();)
+        for(vector<a3EditorShapeData*>::iterator it = shapeList.begin(); it != shapeList.end();)
         {
             bool continued = true;
 
-            a3ShapeData* s = *it;
+            a3EditorShapeData* s = *it;
             if(ImGui::TreeNode(s->name.c_str()))
             {
                 ImGui::TextWrapped(getShapeTypeName(s->type).c_str());
 
                 switch(s->type)
                 {
-                case A3_SHAPETYPE_SPHERE:
+                case A3_SHAPE_SPHERE:
                 {
                     if(ImGui::DragFloat(generateLabel("Radius", s->name).c_str(), &s->radius))
                         s->sphere->setRadius(s->radius);
@@ -460,13 +457,13 @@ void ofApp::shapeWindow()
 
                     break;
                 }
-                case A3_SHAPETYPE_DISK:
+                case A3_SHAPE_DISK:
                     break;
-                case A3_SHAPETYPE_PLANE:
+                case A3_SHAPE_PLANE:
                     break;
-                case A3_SHAPETYPE_TRIANGLE:
+                case A3_SHAPE_TRIANGLE:
                     break;
-                case A3_SHAPETYPE_INFINITE_PLANE:
+                case A3_SHAPE_INFINITE_PLANE:
                     break;
                 }
 
@@ -492,22 +489,22 @@ void ofApp::shapeWindow()
 
             if(ImGui::Button(generateLabel("Ok", "Shape").c_str(), ImVec2(120, 0))) 
             {
-                a3ShapeData* data = new a3ShapeData();
+                a3EditorShapeData* data = new a3EditorShapeData();
                 data->type = (a3ShapeType)item;
                 data->name = "Shape" + ofToString(shapeList.size());
                 switch(data->type)
                 {
-                case A3_SHAPETYPE_SPHERE:
+                case A3_SHAPE_SPHERE:
                     data->sphere = new ofSpherePrimitive();
                     break;
-                case A3_SHAPETYPE_DISK:
+                case A3_SHAPE_DISK:
                     break;
-                case A3_SHAPETYPE_PLANE:
+                case A3_SHAPE_PLANE:
                     data->plane = new ofPlanePrimitive();
                     break;
-                case A3_SHAPETYPE_TRIANGLE:
+                case A3_SHAPE_TRIANGLE:
                     break;
-                case A3_SHAPETYPE_INFINITE_PLANE:
+                case A3_SHAPE_INFINITE_PLANE:
                     break;
                 }
 
@@ -532,30 +529,30 @@ void ofApp::lightWindow()
     {
         ImGui::Begin("Lights");
 
-        for(vector<a3LightData*>::iterator it = lightList.begin(); it != lightList.end();)
+        for(vector<a3EditorLightData*>::iterator it = lightList.begin(); it != lightList.end();)
         {
             bool continued = true;
 
-            a3LightData* l = *it;
+            a3EditorLightData* l = *it;
             if(ImGui::TreeNode(l->name.c_str()))
             {
                 ImGui::TextWrapped(getLightTypeName(l->type).c_str());
 
                 switch(l->type)
                 {
-                case A3_LIGHTTYPE_POINT:
+                case A3_LIGHT_POINT:
                 {
                     ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
                     ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), &l->position[0]);
 
                     break;
                 }
-                case A3_LIGHTTYPE_AREA:
+                case A3_LIGHT_AREA:
                 {
                     ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
                     break;
                 }
-                case A3_LIGHTTYPE_INFINITE_AREA:
+                case A3_LIGHT_INFINITE_AREA:
                 {
                     IMGUI_STYLE_BEGIN(2);
                     if(ImGui::Button(generateLabel("Load Image", l->name).c_str()))
@@ -590,7 +587,7 @@ void ofApp::lightWindow()
 
                     break;
                 }
-                case A3_LIGHTTYPE_SPOT:
+                case A3_LIGHT_SPOT:
                 {
                     // all light needs emmission settings
                     ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
@@ -634,7 +631,7 @@ void ofApp::lightWindow()
 
             if(ImGui::Button(generateLabel("Ok", "Light").c_str(), ImVec2(120, 0)))
             {
-                a3LightData* data = new a3LightData();
+                a3EditorLightData* data = new a3EditorLightData();
                 data->type = (a3LightType) item;
                 data->name = "Light" + ofToString(lightList.size());
                 
@@ -661,7 +658,9 @@ void ofApp::viewWindow()
 
         ImGui::TextWrapped("Preview Mode: %s", getPreviewModeName(previewType).c_str());
         ImGui::TextWrapped("FPS:%.2f", ofGetFrameRate());
+        ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
 
+        ImGui::Separator();
         if(ImGui::TreeNode("Preview Camera"))
         {
             if(freeCamPreview)
@@ -679,6 +678,7 @@ void ofApp::viewWindow()
             ImGui::TreePop();
         }
 
+        ImGui::Separator();
         if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
             previewType = A3_PREVIEW_REALTIME;
         //ImGui::SameLine();
@@ -714,7 +714,7 @@ void ofApp::cameraWindow()
             ImGui::TreePop();
         }
 
-        for(vector<a3CameraData*>::iterator it = cameraList.begin(); it != cameraList.end();)
+        for(vector<a3EditorCameraData*>::iterator it = cameraList.begin(); it != cameraList.end();)
         {
             bool continued = true;
 
@@ -766,7 +766,7 @@ void ofApp::cameraWindow()
 
                 // fov
                 (*it)->fov = (*it)->camera->getFov();
-                if(ImGui::DragFloat(generateLabel("FOV", (*it)->name).c_str(), &(*it)->fov))
+                if(ImGui::DragFloat(generateLabel("FOV", (*it)->name).c_str(), &(*it)->fov, 1.0f, 1.0f, 180.0f))
                 {
                     (*it)->camera->setFov((*it)->fov);
                 }
@@ -775,7 +775,7 @@ void ofApp::cameraWindow()
                 ImGui::DragFloat(generateLabel("Distance", (*it)->name).c_str(), &(*it)->distance);
 
                 IMGUI_BUTTON_DELETE_BEGIN("Camera" + (*it)->name)
-                    a3CameraData* temp = *it;
+                    a3EditorCameraData* temp = *it;
 
                     it = cameraList.erase(it);
                     if(cameraList.size() <= 0)
@@ -840,7 +840,7 @@ void ofApp::cameraWindow()
                 {
                     ofCamera* camera = new ofCamera();
                     //ofEasyCam* camera = new ofEasyCam();
-                    a3CameraData* data = new a3CameraData(camera, buffer);
+                    a3EditorCameraData* data = new a3EditorCameraData(camera, buffer);
                     cameraList.push_back(data);
                 }
                 else

@@ -35,6 +35,7 @@ public:
 
     void updateMQ();
     void guiDraw();
+    void sendInitMessage();
 
     // window
     void modelWindow();
@@ -69,13 +70,13 @@ public:
     ofFbo ipcFbo;
 
     // light
-    vector<a3LightData*> lightList;
+    vector<a3EditorLightData*> lightList;
 
     // models
-    vector<a3ModelData*> modelList;
+    vector<a3EditorModelData*> modelList;
     
     // cameras
-    vector<a3CameraData*> cameraList;
+    vector<a3EditorCameraData*> cameraList;
     bool lockMouseInput;
     int activeCameraIndex;
 
@@ -83,9 +84,10 @@ public:
     // true freecam; false userdefined camera
     bool freeCamPreview;
     a3PreviewType previewType;
+    bool fullScreenIPCPreview;
 
     // shape
-    vector<a3ShapeData*> shapeList;
+    vector<a3EditorShapeData*> shapeList;
 
     // renderer
     int gridLevel[2];

@@ -1,30 +1,14 @@
 #pragma once
 #include "ofMain.h"
 #include "ofxAssimpModelLoader.h"
-
-enum a3ShapeType
-{
-    A3_SHAPETYPE_SPHERE = 0,
-    A3_SHAPETYPE_DISK,
-    A3_SHAPETYPE_PLANE,
-    A3_SHAPETYPE_TRIANGLE,
-    A3_SHAPETYPE_INFINITE_PLANE,
-};
-
-enum a3LightType
-{
-    A3_LIGHTTYPE_POINT = 0,
-    A3_LIGHTTYPE_AREA,
-    A3_LIGHTTYPE_INFINITE_AREA,
-    A3_LIGHTTYPE_SPOT,
-};
+#include "messageQueue/a3Message.h"
 
 struct a3ShapeData;
-struct a3LightData
+struct a3EditorLightData
 {
 public:
-    a3LightData();
-    ~a3LightData();
+    a3EditorLightData();
+    ~a3EditorLightData();
 
     void updatePosition();
     //void updateCone();
@@ -56,6 +40,7 @@ public:
 
     // 开始产生半影的角度(弧度)
     float falloffStart;
+
     float coneHeight;
 
     // display
@@ -66,10 +51,10 @@ private:
     void drawNode();
 };
 
-struct a3ShapeData
+struct a3EditorShapeData
 {
-    a3ShapeData();
-    ~a3ShapeData();
+    a3EditorShapeData();
+    ~a3EditorShapeData();
 
     void draw();
 
@@ -92,11 +77,11 @@ struct a3ShapeData
     ofPlanePrimitive* plane;
 };
 
-struct a3ModelData
+struct a3EditorModelData
 {
-    a3ModelData(ofxAssimpModelLoader* loader, string path, string name)
+    a3EditorModelData(ofxAssimpModelLoader* loader, string path, string name)
         :model(loader), path(path), name(name) {}
-    ~a3ModelData();
+    ~a3EditorModelData();
 
     void draw();
 
@@ -105,10 +90,10 @@ struct a3ModelData
     string name;
 };
 
-struct a3CameraData
+struct a3EditorCameraData
 {
-    a3CameraData(ofCamera* cam, string name);
-    ~a3CameraData();
+    a3EditorCameraData(ofCamera* cam, string name);
+    ~a3EditorCameraData();
 
     void draw();
 
@@ -121,6 +106,7 @@ struct a3CameraData
     ofVec3f up;
 
     float fov;
+    float focalDistance, lensRaidus;
     // width height
     ofVec2f dimension;
 

@@ -171,6 +171,7 @@
     <PostBuildEvent />
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\a3TypeData.cpp" />
     <ClCompile Include="src\log\a3Log.cpp" />
     <ClCompile Include="src\log\a3LogFile.cpp" />
     <ClCompile Include="src\log\a3LogHTML.cpp" />
@@ -195,6 +196,8 @@
     <ClCompile Include="..\..\..\addons\ofxImGui\libs\imgui\src\imgui_draw.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\a3EditorUtils.h" />
+    <ClInclude Include="src\a3TypeData.h" />
     <ClInclude Include="src\log\a3Log.h" />
     <ClInclude Include="src\log\a3LogFile.h" />
     <ClInclude Include="src\log\a3LogHTML.h" />
