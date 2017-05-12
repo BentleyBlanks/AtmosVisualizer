@@ -9,21 +9,21 @@ a3EditorCameraData::a3EditorCameraData(ofCamera * cam, string name)
 
     distance = 100;
 
-    origin.set(0, 0, 0);
-    up.set(0, -1, 0);
-    lookAt.set(0, 0, 1);
+    a3Float3Set(origin, 0, 0, 0);
+    a3Float3Set(up, 0, -1, 0);
+    a3Float3Set(lookat, 0, 0, 1);
 
     dimension.set(768, 768);
 
     cam->setAspectRatio(dimension[0] / dimension[1]);
-    cam->setPosition(origin);
-    cam->lookAt(lookAt, up);
+    cam->setPosition(a3Float3ToVec3(origin));
+    cam->lookAt(a3Float3ToVec3(lookat), a3Float3ToVec3(up));
     cam->setFov(fov);
 }
 
 a3EditorCameraData::~a3EditorCameraData()
 {
-    A3_SAFE_DELETE(camera);
+    //A3_SAFE_DELETE(camera);
 }
 
 void a3EditorCameraData::draw()
@@ -80,7 +80,7 @@ void a3EditorCameraData::draw()
 
 a3EditorModelData::~a3EditorModelData()
 {
-    A3_SAFE_DELETE(model);
+    //A3_SAFE_DELETE(model);
 }
 
 void a3EditorModelData::draw()
@@ -96,8 +96,8 @@ a3EditorShapeData::a3EditorShapeData()
 
     radius = 10.0f;
 
-    position.set(0, 0, 0);
-    normal.set(0, 1, 0);
+    a3Float3Set(position, 0, 0, 0);
+    a3Float3Set(normal, 0, 1, 0);
 
     name = "Shape";
 
@@ -151,7 +151,9 @@ a3EditorLightData::a3EditorLightData()
 
     coneHeight = 100;
 
-    direction.set(0, 1, 0);
+    direction[0] = 0;
+    direction[1] = 1;
+    direction[2] = 0;
 
     //updatePosition();
 }
@@ -165,7 +167,7 @@ void a3EditorLightData::updatePosition()
     //if(type == A3_LIGHT_SPOT)
     //    cone->setPosition(position + direction * coneHeight * 0.5f);
 
-    node->setPosition(position);
+    node->setPosition(a3Float3ToVec3(position));
 }
 
 //void a3LightData::updateCone()
@@ -196,7 +198,8 @@ void a3EditorLightData::draw()
 
         ofPushStyle();
         ofSetColor(ofColor::green);
-        ofDrawArrow(position, position + coneHeight * direction.getNormalized(), 5);
+        ofDrawArrow(a3Float3ToVec3(position), 
+                    a3Float3ToVec3(position) + coneHeight * a3Float3ToVec3(direction).getNormalized(), 5);
         ofPopStyle();
         //cone->drawWireframe();
         break;
@@ -213,38 +216,22 @@ void a3EditorLightData::drawNode()
     node->restoreTransformGL();
 }
 
-string getShapeTypeName(a3ShapeType type)
+ofVec3f a3Float3ToVec3(float * f3)
 {
-    switch(type)
-    {
-    case A3_SHAPE_SPHERE:
-        return "Sphere";
-    case A3_SHAPE_DISK:
-        return "Disk";
-    case A3_SHAPE_PLANE:
-        return "Plane";
-    case A3_SHAPE_TRIANGLE:
-        return "Triangle";
-    case A3_SHAPE_INFINITE_PLANE:
-        return "Infinite Plane";
-    default:
-        return "Unknown Shape Type";
-    }
+    // 不做安全检查
+    return ofVec3f(f3[0], f3[1], f3[2]);
 }
 
-string getLightTypeName(a3LightType type)
+void a3Float3Set(float * f3, float t1, float t2, float t3)
 {
-    switch(type)
-    {
-    case A3_LIGHT_POINT:
-        return "Point Light";
-    case A3_LIGHT_AREA:
-        return "Area Light";
-    case A3_LIGHT_INFINITE_AREA:
-        return "Infinite Light";
-    case A3_LIGHT_SPOT:
-        return "Spot Light";
-    default:
-        return "Unknow Light Type";
-    }
+    f3[0] = t1;
+    f3[1] = t2;
+    f3[2] = t3;
+}
+
+void a3Float3Set(float * f3, ofVec3f v)
+{
+    f3[0] = v.x;
+    f3[1] = v.y;
+    f3[2] = v.z;
 }

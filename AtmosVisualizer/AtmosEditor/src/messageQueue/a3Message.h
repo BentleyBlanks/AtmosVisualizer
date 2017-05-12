@@ -1,9 +1,15 @@
-#pragma once
-#include "a3MessageQueue.h"
+#ifndef A3_MESSAGE_H
+#define A3_MESSAGE_H
+
+#include "messageQueue/a3MessageQueue.h"
 #include "log/a3Log.h"
 
 #define A3_MESSAGE_DEFINE(MessageClass, MessageType)      \
 	MessageClass()  { type = MessageType; }            \
+
+#define A3_FLOAT3CPY(f3Dest, f3Src)  f3Dest[0] = f3Src[0];\
+                                     f3Dest[1] = f3Src[1];\
+                                     f3Dest[2] = f3Src[2];
 
 // grid size definition
 #define A3_GRIDBUFFER_MAX_WIDTH 100
@@ -53,7 +59,8 @@ enum a3MaterialType
 
 enum a3TextureType
 {
-    A3_TEXTURE_IMAGE = 0,
+    A3_TEXTURE_NULL = 0,
+    A3_TEXTURE_IMAGE,
     A3_TEXTURE_CONSTANT,
     A3_TEXTURE_CHECKBOARD
 };
@@ -87,36 +94,27 @@ enum a3ModelType
     A3_MODEL_OBJ = 0
 };
 
-inline std::string a3TypeToString(a3IntegratorType type)
-{
-    switch(type)
-    {
-    case A3_INTEGRATOR_PATH:
-        return "Path Tracing";
-    case A3_INTEGRATOR_DIRECT_LIGHTING:
-        return "Direct Lighting";
-    default:
-        return "Error Type";
-    }
-}
+// To String
+inline std::string a3TypeToString(a3TextureType type);
 
-inline std::string a3TypeToString(a3PrimitiveSetType type)
-{
-    switch(type)
-    {
-    case A3_PRIMITIVESET_EXHAUSTIVE:
-        return "Exhaustive";
-    case A3_PRIMITIVESET_BVH:
-        return "BVH";
-    default:
-        return "Error Type";
-    }
-}
+inline std::string a3TypeToString(a3CameraType type);
+
+inline std::string a3TypeToString(a3ShapeType type);
+
+inline std::string a3TypeToString(a3MaterialType type);
+
+inline std::string a3TypeToString(a3ModelType type);
+
+inline std::string a3TypeToString(a3LightType type);
+
+inline std::string a3TypeToString(a3IntegratorType type);
+
+inline std::string a3TypeToString(a3PrimitiveSetType type);
 
 // 全集
 struct a3TextureData
 {
-    a3TextureType type = A3_TEXTURE_IMAGE;
+    a3TextureType type = A3_TEXTURE_NULL;
 
     // image texture
     char imagePath[A3_ADDRESS_PATH_LENGTH] = "";
@@ -126,6 +124,10 @@ struct a3TextureData
 
     // checkboard texture
     float t1 = 0.2f, t2 = 0.8f, level = 22;
+
+    inline a3TextureData& operator=(const a3TextureData& c);
+
+    inline void print() const;
 };
 
 struct a3MaterialData
@@ -137,6 +139,10 @@ struct a3MaterialData
 
     // texture
     a3TextureData textureData;
+
+    inline a3MaterialData& operator=(const a3MaterialData& c);
+
+    inline void print() const;
 };
 
 struct a3ShapeData
@@ -160,6 +166,10 @@ struct a3ShapeData
 
     // plane
     float width = 0.0f, height = 0.0f;
+
+    inline a3ShapeData& operator=(const a3ShapeData& c);
+
+    inline void print() const;
 };
 
 struct a3LightData
@@ -187,6 +197,10 @@ struct a3LightData
 
     // 开始产生半影的角度(弧度)
     float falloffStart = 0.0f;
+
+    inline a3LightData& operator=(const a3LightData& c);
+
+    inline void print() const;
 };
 
 struct a3ModelData
@@ -194,7 +208,13 @@ struct a3ModelData
     // 默认仅支持.obj
     a3ModelType type;
 
+    a3MaterialData materialData;
+
     char path[A3_ADDRESS_PATH_LENGTH] = "";
+
+    inline a3ModelData& operator=(const const a3ModelData& c);
+
+    inline void print() const;
 };
 
 struct a3CameraData
@@ -205,43 +225,18 @@ struct a3CameraData
 
     float fov = 40.0f, focalDistance = 100.0f, lensRadius = 0.0f;
 
-    void print() const
-    {
-        a3Log::debug("Camera origin[%f, %f, %f] lookat[%f, %f, %f] up[%f, %f, %f]\n",
-                     origin[0], origin[1], origin[2],
-                     lookat[0], lookat[1], lookat[2],
-                     up[0], up[1], up[2]);
-        a3Log::debug("Camera fov:%f focalDistance:%f lensRadius:%f\n", fov, focalDistance, lensRadius);
-    }
+    inline a3CameraData& operator=(const a3CameraData& c);
+
+    inline void print() const;
 };
 
 // Server to Client
 // the info that rendered scene needed
 struct a3S2CInitMessage : public a3MessageEntryHead
 {
-    a3S2CInitMessage(const a3S2CInitMessage& msg) :
-        imageWidth(msg.imageWidth), imageHeight(msg.imageHeight),
-        levelX(msg.levelX), levelY(msg.levelY),
-        spp(msg.spp), enableGammaCorrection(msg.enableGammaCorrection), enableToneMapping(msg.enableToneMapping),
-        maxDepth(msg.maxDepth), russianRouletteDepth(msg.russianRouletteDepth),
-        integratorType(msg.integratorType), primitiveSetType(msg.primitiveSetType)
-    {
-        strcpy(imagePath, msg.imagePath);
-    }
+    inline a3S2CInitMessage(const a3S2CInitMessage& msg);
 
-    void print() const
-    {
-        a3Log::info("------------------------------a3S2CInitMessage Info Begin------------------------------\n");
-        camera.print();
-        a3Log::debug("Film path:%s, dimension[%d, %d], level[%d, %d]\n", imagePath, imageWidth, imageHeight, levelX, levelY);
-        a3Log::debug("Integrator type:%s, maxDepth:%d, russianRouletteDepth:%d\n", a3TypeToString(integratorType).c_str(), maxDepth, russianRouletteDepth);
-        a3Log::debug("PrimitiveSet type:%s\n", a3TypeToString(primitiveSetType).c_str());
-        a3Log::debug("Renderer spp:%d, enableGammaCorrection:%d, enableToneMapping:%d\n", spp, enableGammaCorrection, enableToneMapping);
-        a3Log::debug("ShapeList length:%d\n", shapeList.size());
-        a3Log::debug("ModelList length:%d\n", modelList.size());
-        a3Log::debug("LightList length:%d\n", lightList.size());
-        a3Log::info("------------------------------a3S2CInitMessage Info End------------------------------\n");
-    }
+    inline void print() const;
 
     // camrea
     a3CameraData camera;
@@ -265,13 +260,11 @@ struct a3S2CInitMessage : public a3MessageEntryHead
     int maxDepth = -1, russianRouletteDepth = 4;
 
     // shapes
-    std::vector<a3ShapeData> shapeList;
+    a3ShapeData shapeList[32];
+    a3ModelData modelList[32];
+    a3LightData lightList[32];
 
-    // models
-    std::vector<a3ModelData> modelList;
-
-    // lights
-    std::vector<a3LightData> lightList;
+    int shapeListLength = 0, modelListLength = 0, lightListLength = 0;
 
     A3_MESSAGE_DEFINE(a3S2CInitMessage, A3_S2C_MSG_INIT)
 };
@@ -288,3 +281,7 @@ struct a3C2SGridBufferMessage : public a3MessageEntryHead
 
     A3_MESSAGE_DEFINE(a3C2SGridBufferMessage, A3_C2S_MSG_GRIDIMAGE)
 };
+
+#include "messageQueue/a3Messsage.inl"
+
+#endif

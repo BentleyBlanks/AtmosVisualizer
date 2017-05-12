@@ -7,7 +7,8 @@
 #include <ShellAPI.h>
 
 const int msgMaxNum = 100;
-const int msgMaxSize = sizeof(a3C2SGridBufferMessage);
+const int S2CMsgSize = sizeof(a3S2CInitMessage);
+const int C2SMsgSize = sizeof(a3C2SGridBufferMessage);
 
 #define A3_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
 
@@ -27,8 +28,8 @@ static int styleID = 0;
 #define IMGUI_BUTTON_DELETE_END()           }IMGUI_STYLE_END();
 
 #ifdef _DEBUG
-//static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe";
-//#else
+static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe";
+#else
 static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe";
 #endif
 
@@ -85,8 +86,9 @@ void ofApp::setup()
 
     // preview 
     ground = new Graph3D(650, 650, 30, 30);
-    ipcS2C.init(L"Who's Your Daddy S2C", true, 50, 2048);
-    ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, msgMaxSize);
+
+    ipcS2C.init(L"Who's Your Daddy S2C", true, msgMaxNum / 2, S2CMsgSize);
+    ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, C2SMsgSize);
     fullScreenIPCPreview = false;
 
     // window
@@ -107,6 +109,8 @@ void ofApp::setup()
 
     // renderer
     spp = 16;
+    maxDepth = -1;
+    russianRouletteDepth = 4;
     enableGammaCorrection = true;
     enableToneMapping = false;
     gridLevel[0] = 16;
@@ -126,8 +130,8 @@ void ofApp::updateMQ()
     // check the message queue
     if(!ipcC2S.isEmpty())
     {
-        char msg_buffer[msgMaxSize];
-        memset(msg_buffer, 0, msgMaxSize);
+        char msg_buffer[C2SMsgSize];
+        memset(msg_buffer, 0, C2SMsgSize);
 
         a3MessageEntryHead* pMsg = (a3MessageEntryHead*) msg_buffer;
         while(ipcC2S.dequeue(*pMsg))
@@ -252,29 +256,34 @@ void ofApp::guiDraw()
 
             if(ImGui::MenuItem("Render IPC", NULL))
             {
-                a3Log::info("Start IPC Rendering\n");
-
-                SHELLEXECUTEINFO shell = {sizeof(shell)};
-                shell.fMask = SEE_MASK_FLAG_DDEWAIT;
-                shell.lpVerb = L"open";
-                shell.lpFile = atmosEXEPath.c_str();
-                shell.nShow = SW_SHOWNORMAL;
-                BOOL ret = ShellExecuteEx(&shell);
-                if(ret == TRUE)
+                if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
                 {
-                    sendInitMessage();
-                }
-                else
-                {
-                    a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
+                    a3Log::info("Start IPC Rendering\n");
 
-                    ofFileDialogResult result = ofSystemLoadDialog("Select Atmos exe");
-                    if(result.bSuccess)
+                    SHELLEXECUTEINFO shell = {sizeof(shell)};
+                    shell.fMask = SEE_MASK_FLAG_DDEWAIT;
+                    shell.lpVerb = L"open";
+                    shell.lpFile = atmosEXEPath.c_str();
+                    shell.nShow = SW_SHOWNORMAL;
+                    BOOL ret = ShellExecuteEx(&shell);
+                    if(ret == TRUE)
                     {
-                        atmosEXEPath = a3S2WS(result.filePath);
-                        a3Log::debug("Atmos exe path: %s\n", result.filePath.c_str());
+                        sendInitMessage();
+                    }
+                    else
+                    {
+                        a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
+
+                        ofFileDialogResult result = ofSystemLoadDialog("Select Atmos exe");
+                        if(result.bSuccess)
+                        {
+                            atmosEXEPath = a3S2WS(result.filePath);
+                            a3Log::debug("Atmos exe path: %s\n", result.filePath.c_str());
+                        }
                     }
                 }
+                else
+                    a3Log::warning("IPC Render needs a camera to be actived\n");
             }
 
             ImGui::EndMenu();
@@ -321,43 +330,64 @@ void ofApp::guiDraw()
 
 void ofApp::sendInitMessage()
 {
-    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
-    {
-        a3EditorCameraData* data = cameraList[activeCameraIndex];
+    a3EditorCameraData* data = cameraList[activeCameraIndex];
 
-        if(ipcFbo.isAllocated())
-            ipcFbo.clear();
+    if(ipcFbo.isAllocated())
+        ipcFbo.clear();
 
-        // init the grid preview fbo
-        ipcFbo.allocate(data->dimension.x, data->dimension.y, GL_RGBA);
-        ipcFbo.begin();
-        ofClear(255, 255, 255);
-        ipcFbo.end();
+    // init the grid preview fbo
+    ipcFbo.allocate(data->dimension.x, data->dimension.y, GL_RGBA);
+    ipcFbo.begin();
+    ofClear(255, 255, 255);
+    ipcFbo.end();
 
-        // send init msg
-        a3S2CInitMessage* msg = new a3S2CInitMessage();
-        // renderer
-        msg->imageWidth = data->dimension.x;
-        msg->imageHeight = data->dimension.y;
-        msg->enableToneMapping = enableToneMapping;
-        msg->enableGammaCorrection = enableGammaCorrection;
-        msg->levelX = gridLevel[0];
-        msg->levelY = gridLevel[1];
-        msg->spp = spp;
+    // send init msg
+    a3S2CInitMessage* msg = new a3S2CInitMessage();
 
-        // models
-        // shapes
-        // lights
-        // camera
-        if(!ipcS2C.isFull())
-            ipcS2C.enqueue(*msg);
-        else
-            a3Log::warning("Full Message Queue\n");
+    // renderer
+    strcpy(msg->imagePath, saveImagePath.c_str());
+    msg->imageWidth = data->dimension.x;
+    msg->imageHeight = data->dimension.y;
+    msg->levelX = gridLevel[0];
+    msg->levelY = gridLevel[1];
 
-        delete msg;
-    }
+    msg->enableToneMapping = enableToneMapping;
+    msg->enableGammaCorrection = enableGammaCorrection;
+
+    msg->integratorType = (a3IntegratorType) integratorType;
+    msg->primitiveSetType = (a3PrimitiveSetType) primitiveSetType;
+
+    msg->spp = spp;
+    msg->maxDepth = maxDepth;
+    msg->russianRouletteDepth = russianRouletteDepth;
+
+    // camera(operator =)
+    msg->camera = *data;
+
+    // models
+    msg->modelListLength = modelList.size();
+    for(int i = 0; i < modelList.size(); i++)
+        // operator =
+        msg->modelList[i] = *modelList[i];
+
+    // shapes
+    msg->shapeListLength = shapeList.size();
+    for(int i = 0; i < shapeList.size(); i++)
+        // operator =
+        msg->shapeList[i] = *shapeList[i];
+
+    // lights
+    msg->lightListLength = lightList.size();
+    for(int i = 0; i < lightList.size(); i++)
+        // operator =
+        msg->lightList[i] = *lightList[i];
+
+    if(!ipcS2C.isFull())
+        ipcS2C.enqueue(*msg);
     else
-        a3Log::warning("IPC Render needs a camera to be actived\n");
+        a3Log::warning("Full Message Queue\n");
+
+    delete msg;
 }
 
 //--------------------------------------------------------------
@@ -443,7 +473,7 @@ void ofApp::shapeWindow()
             a3EditorShapeData* s = *it;
             if(ImGui::TreeNode(s->name.c_str()))
             {
-                ImGui::TextWrapped(getShapeTypeName(s->type).c_str());
+                ImGui::TextWrapped(a3TypeToString(s->type).c_str());
 
                 switch(s->type)
                 {
@@ -453,7 +483,7 @@ void ofApp::shapeWindow()
                         s->sphere->setRadius(s->radius);
                     
                     if(ImGui::DragFloat3(generateLabel("Position", s->name).c_str(), &s->position[0]))
-                        s->sphere->setPosition(s->position);
+                        s->sphere->setPosition(a3Float3ToVec3(s->position));
 
                     break;
                 }
@@ -536,20 +566,20 @@ void ofApp::lightWindow()
             a3EditorLightData* l = *it;
             if(ImGui::TreeNode(l->name.c_str()))
             {
-                ImGui::TextWrapped(getLightTypeName(l->type).c_str());
+                ImGui::TextWrapped(a3TypeToString(l->type).c_str());
 
                 switch(l->type)
                 {
                 case A3_LIGHT_POINT:
                 {
-                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
-                    ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), &l->position[0]);
+                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
+                    ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), l->position);
 
                     break;
                 }
                 case A3_LIGHT_AREA:
                 {
-                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
+                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
                     break;
                 }
                 case A3_LIGHT_INFINITE_AREA:
@@ -570,7 +600,7 @@ void ofApp::lightWindow()
 
                     if(l->image.isAllocated())
                     {
-                        ImGui::TextWrapped(("Path: " + l->imagePath).c_str());
+                        ImGui::TextWrapped(("Path: " + string(l->imagePath)).c_str());
                         float ratio = l->image.getWidth() / l->image.getHeight();
                         float w = ImGui::GetContentRegionAvailWidth();
                         GLuint a = l->image.getTexture().getTextureData().textureID;
@@ -590,12 +620,12 @@ void ofApp::lightWindow()
                 case A3_LIGHT_SPOT:
                 {
                     // all light needs emmission settings
-                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), &l->emission[0]);
+                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
 
-                    if(ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), &l->position[0]))
+                    if(ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), l->position))
                         l->updatePosition();
 
-                    ImGui::DragFloat3(generateLabel("Direction", l->name).c_str(), &l->direction[0]);
+                    ImGui::DragFloat3(generateLabel("Direction", l->name).c_str(), l->direction);
 
                     ImGui::DragFloat(generateLabel("Cone Angle", l->name).c_str(), &l->coneAngle);
 
@@ -747,21 +777,21 @@ void ofApp::cameraWindow()
 
                 // camera or(*it)ation
                 //(*it)->lookAt = (*it)->camera->getLookAtDir();
-                if(ImGui::DragFloat3(generateLabel("Look At", (*it)->name).c_str(), &(*it)->lookAt[0]))
+                if(ImGui::DragFloat3(generateLabel("Look At", (*it)->name).c_str(), &(*it)->lookat[0]))
                 {
-                    (*it)->camera->lookAt((*it)->lookAt, (*it)->up);
+                    (*it)->camera->lookAt(a3Float3ToVec3((*it)->lookat), a3Float3ToVec3(((*it)->up)));
                 }
 
                 //(*it)->up = (*it)->camera->getUpDir();
                 if(ImGui::DragFloat3(generateLabel("Up", (*it)->name).c_str(), &(*it)->up[0]))
                 {
-                    (*it)->camera->lookAt((*it)->lookAt, (*it)->up);
+                    (*it)->camera->lookAt(a3Float3ToVec3((*it)->lookat), a3Float3ToVec3((*it)->up));
                 }
 
-                (*it)->origin = (*it)->camera->getPosition();
+                a3Float3Set((*it)->origin, (*it)->camera->getPosition());
                 if(ImGui::DragFloat3(generateLabel("Origin", (*it)->name).c_str(), &(*it)->origin[0]))
                 {
-                    (*it)->camera->setPosition((*it)->origin);
+                    (*it)->camera->setPosition(a3Float3ToVec3((*it)->origin));
                 }
 
                 // fov
@@ -866,10 +896,28 @@ void ofApp::rendererWindow()
 
     ImGui::Begin("Renderer");
 
+    ImGui::Combo("Integrator Type", &integratorType, "Path Tracing\0Direct Lighting\0");
+    ImGui::Combo("PrimitiveSet Type", &primitiveSetType, "Exhaustive\0BVH\0");
+
     ImGui::DragInt2("Grid Level", gridLevel, 1, 1, 500);
     ImGui::DragInt("Spp", &spp, 1, 1, 10000);
     ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
     ImGui::Checkbox("Enable Tone Mapping", &enableToneMapping);
+
+    if(integratorType == A3_INTEGRATOR_PATH)
+    {
+        ImGui::DragInt("Max Depth", &maxDepth);
+        ImGui::DragInt("RussianRoulette Depth", &russianRouletteDepth);
+    }
+
+    IMGUI_STYLE_BEGIN(2);
+    if(ImGui::Button(generateLabel("Select Save Image Path", "Renderer").c_str()))
+    {
+        ofFileDialogResult result = ofSystemSaveDialog("1.png", "");
+        if(result.bSuccess)
+            saveImagePath = result.filePath;
+    }
+    IMGUI_STYLE_END();
 
     ImGui::End();
 }
@@ -904,6 +952,19 @@ ofCamera* ofApp::getActiveCamera()
             return cameraList[activeCameraIndex]->camera;
         else
             return &freeCam;
+    }
+}
+
+a3EditorCameraData* ofApp::getActiveCameraData()
+{
+    if(freeCamPreview)
+        return NULL;
+    else
+    {
+        if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+            return cameraList[activeCameraIndex];
+        else
+            return NULL;
     }
 }
 

@@ -3,55 +3,39 @@
 #include "ofxAssimpModelLoader.h"
 #include "messageQueue/a3Message.h"
 
+ofVec3f a3Float3ToVec3(float* f3);
+
+void a3Float3Set(float* f3, float t1, float t2, float t3);
+
+void a3Float3Set(float* f3, ofVec3f v);
+
 struct a3ShapeData;
-struct a3EditorLightData
+struct a3EditorLightData : public a3LightData
 {
 public:
     a3EditorLightData();
     ~a3EditorLightData();
 
     void updatePosition();
-    //void updateCone();
 
     void draw();
 
     string name;
-    a3LightType type;
-
-    // all 
-    ofVec3f emission;
-
-    // --------------------area--------------------
-    a3ShapeData* shape;
 
     // --------------------infinite light--------------------
-    string imageName, imagePath;
+    string imageName;
     ofImage image;
     GLuint imageID;
-
-    // --------------------point spot--------------------
-    ofVec3f position;
-
-    // --------------------spot--------------------
-    ofVec3f direction;
-
-    // 圆锥与中心线夹角(弧度)
-    float coneAngle;
-
-    // 开始产生半影的角度(弧度)
-    float falloffStart;
 
     float coneHeight;
 
     // display
     ofNode* node;
-    //ofConePrimitive* cone;
-
 private:
     void drawNode();
 };
 
-struct a3EditorShapeData
+struct a3EditorShapeData : public a3ShapeData
 {
     a3EditorShapeData();
     ~a3EditorShapeData();
@@ -59,38 +43,29 @@ struct a3EditorShapeData
     void draw();
 
     string name;
-    a3ShapeType type;
-
-    // sphere disk
-    float radius;
-
-    // common
-    ofVec3f position;
-
-    // disk plane infinite_plane
-    ofVec3f normal;
-
-    // plane
-    float width, height;
 
     ofSpherePrimitive* sphere;
     ofPlanePrimitive* plane;
 };
 
-struct a3EditorModelData
+struct a3EditorModelData : public a3ModelData
 {
-    a3EditorModelData(ofxAssimpModelLoader* loader, string path, string name)
-        :model(loader), path(path), name(name) {}
+    a3EditorModelData(ofxAssimpModelLoader* loader, string modelPath, string name) 
+        :model(loader), name(name)
+    {
+        if(modelPath.length() <= A3_ADDRESS_PATH_LENGTH)
+            strcpy(path, modelPath.c_str());
+    }
+
     ~a3EditorModelData();
 
     void draw();
 
     ofxAssimpModelLoader* model;
-    string path;
     string name;
 };
 
-struct a3EditorCameraData
+struct a3EditorCameraData : public a3CameraData
 {
     a3EditorCameraData(ofCamera* cam, string name);
     ~a3EditorCameraData();
@@ -101,12 +76,6 @@ struct a3EditorCameraData
     //ofEasyCam* camera;
     string name;
 
-    ofVec3f origin;
-    ofVec3f lookAt;
-    ofVec3f up;
-
-    float fov;
-    float focalDistance, lensRaidus;
     // width height
     ofVec2f dimension;
 
@@ -114,7 +83,3 @@ struct a3EditorCameraData
     bool lockMouseInput;
     bool active;
 };
-
-string getShapeTypeName(a3ShapeType type);
-
-string getLightTypeName(a3LightType type);

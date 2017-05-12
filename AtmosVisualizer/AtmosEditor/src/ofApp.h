@@ -55,6 +55,7 @@ public:
 
     // camera
     ofCamera* getActiveCamera();
+    a3EditorCameraData* getActiveCameraData();
 
     // editor
     ofxImGui::Gui gui; 
@@ -90,7 +91,10 @@ public:
     vector<a3EditorShapeData*> shapeList;
 
     // renderer
+    string saveImagePath;
     int gridLevel[2];
     bool enableGammaCorrection, enableToneMapping;
     int spp;
+    int maxDepth, russianRouletteDepth;
+    int integratorType, primitiveSetType;
 };
