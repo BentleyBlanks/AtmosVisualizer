@@ -23,9 +23,10 @@ public:
     string name;
 
     // --------------------infinite light--------------------
-    string imageName;
-    ofImage image;
-    GLuint imageID;
+    //string imageName;
+    //ofImage image;
+    //GLuint imageID;
+    int textureIndex;
 
     float coneHeight;
 
@@ -43,6 +44,7 @@ struct a3EditorShapeData : public a3ShapeData
     void draw();
 
     string name;
+    int materialIndex;
 
     ofSpherePrimitive* sphere;
     ofPlanePrimitive* plane;
@@ -50,19 +52,14 @@ struct a3EditorShapeData : public a3ShapeData
 
 struct a3EditorModelData : public a3ModelData
 {
-    a3EditorModelData(ofxAssimpModelLoader* loader, string modelPath, string name) 
-        :model(loader), name(name)
-    {
-        if(modelPath.length() <= A3_ADDRESS_PATH_LENGTH)
-            strcpy(path, modelPath.c_str());
-    }
-
+    a3EditorModelData(ofxAssimpModelLoader* loader, string modelPath, string name);
     ~a3EditorModelData();
 
     void draw();
 
     ofxAssimpModelLoader* model;
     string name;
+    int materialIndex;
 };
 
 struct a3EditorCameraData : public a3CameraData
@@ -82,4 +79,26 @@ struct a3EditorCameraData : public a3CameraData
     float distance;
     bool lockMouseInput;
     bool active;
+};
+
+struct a3EditorMaterialData : public a3MaterialData
+{
+    a3EditorMaterialData();
+    ~a3EditorMaterialData() {}
+
+    string name;
+
+    int textureIndex;
+};
+
+struct a3EditorTextureData : public a3TextureData
+{
+    a3EditorTextureData();
+    ~a3EditorTextureData() {}
+
+    string name;
+
+    // for image texture
+    ofImage image;
+    //GLuint imageID;
 };

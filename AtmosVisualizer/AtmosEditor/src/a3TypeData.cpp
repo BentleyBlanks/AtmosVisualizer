@@ -78,6 +78,13 @@ void a3EditorCameraData::draw()
     ofPopStyle();
 }
 
+a3EditorModelData::a3EditorModelData(ofxAssimpModelLoader * loader, string modelPath, string name)
+    :model(loader), name(name), materialIndex(-1)
+{
+    if(modelPath.length() <= A3_ADDRESS_PATH_LENGTH)
+        strcpy(path, modelPath.c_str());
+}
+
 a3EditorModelData::~a3EditorModelData()
 {
     //A3_SAFE_DELETE(model);
@@ -90,7 +97,7 @@ void a3EditorModelData::draw()
     ofPopStyle();
 }
 
-a3EditorShapeData::a3EditorShapeData()
+a3EditorShapeData::a3EditorShapeData() : materialIndex(-1)
 {
     type = A3_SHAPE_SPHERE;
 
@@ -136,7 +143,7 @@ void a3EditorShapeData::draw()
     //ofPopStyle();
 }
 
-a3EditorLightData::a3EditorLightData()
+a3EditorLightData::a3EditorLightData() : textureIndex(-1)
 {
     type = A3_LIGHT_POINT;
 
@@ -214,6 +221,14 @@ void a3EditorLightData::drawNode()
     node->transformGL();
     node->draw();
     node->restoreTransformGL();
+}
+
+a3EditorTextureData::a3EditorTextureData()
+{
+}
+
+a3EditorMaterialData::a3EditorMaterialData() : textureIndex(-1)
+{
 }
 
 ofVec3f a3Float3ToVec3(float * f3)

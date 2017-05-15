@@ -41,12 +41,12 @@ public:
     void modelWindow();
     void shapeWindow();
     void lightWindow();
-    void viewWindow();
     void cameraWindow();
     void rendererWindow();
-
-    // about window
-    void aboutWindow();
+    void materialWindow();
+    void textureWindow();
+    //void viewWindow();
+    //void aboutWindow();
 
     // preview
     void realtimePreview();
@@ -59,7 +59,9 @@ public:
 
     // editor
     ofxImGui::Gui gui; 
-    bool openViewWindow, openCameraWindow, openShapeWindow, openLightWindow, openModelWindow, openAboutWindow, openRendererWindow;
+    // bool openViewWindow;
+    bool openCameraWindow, openShapeWindow, openLightWindow, openModelWindow, 
+         openAboutWindow, openRendererWindow, openMaterialWindow, openTextureWindow;
 
     ofImage logo;
     GLuint logoButtonID;
@@ -75,7 +77,13 @@ public:
 
     // models
     vector<a3EditorModelData*> modelList;
+
+    // material
+    vector<a3EditorMaterialData*> materialList;
     
+    // texture
+    vector<a3EditorTextureData*> textureList;
+
     // cameras
     vector<a3EditorCameraData*> cameraList;
     bool lockMouseInput;

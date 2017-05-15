@@ -22,16 +22,56 @@ static int styleID = 0;
 #define IMGUI_STYLE_END()           ImGui::PopStyleColor(3); \
                                     ImGui::PopID();
 
-#define IMGUI_BUTTON_DELETE_BEGIN(name)     IMGUI_STYLE_BEGIN(0);\
-                                            if(ImGui::Button(generateLabel("Delete", name).c_str())){
+#define IMGUI_BUTTON_DELETE_BEGIN(name)     {IMGUI_STYLE_BEGIN(0);\
+                                            if(ImGui::Button(generateLabel("Delete", name).c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0))){
 
-#define IMGUI_BUTTON_DELETE_END()           }IMGUI_STYLE_END();
+#define IMGUI_BUTTON_DELETE_END()           }IMGUI_STYLE_END();}
 
-#ifdef _DEBUG
-static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe";
-#else
-static wstring atmosEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe";
-#endif
+#define IMGUI_POPUP_SELECT_TEXTURE(domainName, destIndex)           if(destIndex != -1)\
+                                                                        ImGui::TextWrapped("Texture Name: %s", textureList[destIndex]->name.c_str());\
+                                                                    if(ImGui::Button(generateLabel("Choose Texture", domainName).c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))\
+                                                                        ImGui::OpenPopup("Select Texture In Library");\
+                                                                    if(ImGui::BeginPopupModal("Select Texture In Library", NULL, ImGuiWindowFlags_AlwaysAutoResize)){\
+                                                                        static int selectedIndex = -1; \
+                                                                        ImGui::ListBoxHeader(generateLabel("Select Texture", domainName).c_str());\
+                                                                        for(int i = 0; i < textureList.size(); i++){\
+                                                                            if(ImGui::Selectable(textureList[i]->name.c_str(), selectedIndex == i ? true : false)){\
+                                                                               destIndex = i;\
+                                                                               selectedIndex = i; \
+                                                                            }\
+                                                                        }\
+                                                                        ImGui::ListBoxFooter();\
+                                                                        if(ImGui::Button(generateLabel("OK", "Select Texture").c_str(), ImVec2(120, 0))) { \
+                                                                            if(selectedIndex != -1) ImGui::CloseCurrentPopup(); }\
+                                                                        ImGui::SameLine();\
+                                                                        if(ImGui::Button(generateLabel("Cancel", "Select Texture").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }\
+                                                                        ImGui::EndPopup();\
+                                                                    }
+
+#define IMGUI_POPUP_SELECT_MATERIAL(domainName, destIndex)          if(destIndex != -1)\
+                                                                        ImGui::TextWrapped("Material Name: %s", materialList[destIndex]->name.c_str());\
+                                                                    if(ImGui::Button(generateLabel("Choose Material", domainName).c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))\
+                                                                        ImGui::OpenPopup("Select Material In Library");\
+                                                                    if(ImGui::BeginPopupModal("Select Material In Library", NULL, ImGuiWindowFlags_AlwaysAutoResize)){\
+                                                                        static int selectedIndex = -1; \
+                                                                        ImGui::ListBoxHeader(generateLabel("Select Material", domainName).c_str());\
+                                                                        for(int i = 0; i < materialList.size(); i++){\
+                                                                            if(ImGui::Selectable(materialList[i]->name.c_str(), selectedIndex == i ? true : false)){\
+                                                                               destIndex = i;\
+                                                                               selectedIndex = i; \
+                                                                            }\
+                                                                        }\
+                                                                        ImGui::ListBoxFooter();\
+                                                                        if(ImGui::Button(generateLabel("OK", "Select Material").c_str(), ImVec2(120, 0))) { \
+                                                                            if(selectedIndex != -1) ImGui::CloseCurrentPopup(); }\
+                                                                        ImGui::SameLine();\
+                                                                        if(ImGui::Button(generateLabel("Cancel", "Select Material").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }\
+                                                                        ImGui::EndPopup();\
+                                                                    }
+
+static wstring atmosDebugEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Debug\\AtmosTestd.x64.exe";
+
+static wstring atmosReleaseEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe";
 
 string getWindowToggleName(string windowName, bool windowOpened)
 {
@@ -94,11 +134,13 @@ void ofApp::setup()
     // window
     openCameraWindow = true;
     openShapeWindow = true;
-    openViewWindow = true;
     openLightWindow = true;
     openModelWindow = true;
     openRendererWindow = true;
-    openAboutWindow = false;
+    openMaterialWindow = true;
+    openTextureWindow = true;
+    //openViewWindow = true;
+    //openAboutWindow = false;
 
     // about window
     ofDisableArbTex();
@@ -115,6 +157,8 @@ void ofApp::setup()
     enableToneMapping = false;
     gridLevel[0] = 16;
     gridLevel[1] = 16;
+
+    ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
 }
 
 //--------------------------------------------------------------
@@ -250,40 +294,75 @@ void ofApp::guiDraw()
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("Render"))
+        if(ImGui::BeginMenu("Build"))
         {
-            if(ImGui::MenuItem("Render Local", NULL)) { /*--! in the future*/ }
+            if(ImGui::MenuItem("Start Local", NULL)) { /*--! in the future*/ }
 
-            if(ImGui::MenuItem("Render IPC", NULL))
+            if(ImGui::BeginMenu("Start IPC"))
             {
-                if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+                if(ImGui::MenuItem(generateLabel("Debug", "IPC").c_str()))
                 {
-                    a3Log::info("Start IPC Rendering\n");
-
-                    SHELLEXECUTEINFO shell = {sizeof(shell)};
-                    shell.fMask = SEE_MASK_FLAG_DDEWAIT;
-                    shell.lpVerb = L"open";
-                    shell.lpFile = atmosEXEPath.c_str();
-                    shell.nShow = SW_SHOWNORMAL;
-                    BOOL ret = ShellExecuteEx(&shell);
-                    if(ret == TRUE)
+                    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
                     {
-                        sendInitMessage();
+                        a3Log::info("Start IPC Debug Rendering\n");
+
+                        SHELLEXECUTEINFO shell = {sizeof(shell)};
+                        shell.fMask = SEE_MASK_FLAG_DDEWAIT;
+                        shell.lpVerb = L"open";
+                        shell.lpFile = atmosDebugEXEPath.c_str();
+                        shell.nShow = SW_SHOWNORMAL;
+                        BOOL ret = ShellExecuteEx(&shell);
+                        if(ret == TRUE)
+                            sendInitMessage();
+                        else
+                            a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
                     }
                     else
-                    {
-                        a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
+                        a3Log::warning("IPC Render needs a camera to be actived\n");
+                }
 
-                        ofFileDialogResult result = ofSystemLoadDialog("Select Atmos exe");
-                        if(result.bSuccess)
-                        {
-                            atmosEXEPath = a3S2WS(result.filePath);
-                            a3Log::debug("Atmos exe path: %s\n", result.filePath.c_str());
-                        }
+                if(ImGui::MenuItem(generateLabel("Release", "IPC").c_str()))
+                {
+                    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+                    {
+                        a3Log::info("Start IPC Release Rendering\n");
+
+                        SHELLEXECUTEINFO shell = {sizeof(shell)};
+                        shell.fMask = SEE_MASK_FLAG_DDEWAIT;
+                        shell.lpVerb = L"open";
+                        shell.lpFile = atmosReleaseEXEPath.c_str();
+                        shell.nShow = SW_SHOWNORMAL;
+                        BOOL ret = ShellExecuteEx(&shell);
+                        if(ret == TRUE)
+                            sendInitMessage();
+                        else
+                            a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
+                    }
+                    else
+                        a3Log::warning("IPC Render needs a camera to be actived\n");
+                }
+
+                if(ImGui::MenuItem(generateLabel("Select Atmos Debug EXE...", "IPC").c_str()))
+                {
+                    ofFileDialogResult result = ofSystemLoadDialog("Select Atmos Debug exe");
+                    if(result.bSuccess)
+                    {
+                        atmosDebugEXEPath = a3S2WS(result.filePath);
+                        a3Log::debug("Atmos exe path: %s\n", result.filePath.c_str());
                     }
                 }
-                else
-                    a3Log::warning("IPC Render needs a camera to be actived\n");
+
+                if(ImGui::MenuItem(generateLabel("Select Atmos Release EXE...", "IPC").c_str()))
+                {
+                    ofFileDialogResult result = ofSystemLoadDialog("Select Atmos release exe");
+                    if(result.bSuccess)
+                    {
+                        atmosReleaseEXEPath = a3S2WS(result.filePath);
+                        a3Log::debug("Atmos exe path: %s\n", result.filePath.c_str());
+                    }
+                }
+
+                ImGui::EndMenu();
             }
 
             ImGui::EndMenu();
@@ -297,18 +376,63 @@ void ofApp::guiDraw()
 
             if(ImGui::MenuItem(getWindowToggleName("Model", openModelWindow).c_str(), NULL)) { openModelWindow = !openModelWindow; }
 
-            if(ImGui::MenuItem(getWindowToggleName("View", openViewWindow).c_str(), NULL)) { openViewWindow = !openViewWindow; }
+            //if(ImGui::MenuItem(getWindowToggleName("View", openViewWindow).c_str(), NULL)) { openViewWindow = !openViewWindow; }
 
             if(ImGui::MenuItem(getWindowToggleName("Camera", openCameraWindow).c_str(), NULL)) { openCameraWindow = !openCameraWindow; }
 
             if(ImGui::MenuItem(getWindowToggleName("Renderer", openRendererWindow).c_str(), NULL)) { openRendererWindow = !openRendererWindow; }
 
+            if(ImGui::MenuItem(getWindowToggleName("Material", openMaterialWindow).c_str(), NULL)) { openMaterialWindow = !openMaterialWindow; }
+
+            if(ImGui::MenuItem(getWindowToggleName("Texture", openTextureWindow).c_str(), NULL)) { openTextureWindow = !openTextureWindow; }
+            
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("About")) 
-        { 
-            openAboutWindow = !openAboutWindow;
+        // 替代View Window 为腾出空间给材质编辑Window
+        if(ImGui::BeginMenu("View"))
+        {
+            ImGui::Text("Preview Mode: %s", getPreviewModeName(previewType).c_str());
+            ImGui::Text("FPS:%.2f", ofGetFrameRate());
+            ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
+
+            ImGui::Separator();
+            if(ImGui::TreeNode("Preview Camera"))
+            {
+                if(freeCamPreview)
+                    ImGui::Text("Mode: Free Camera");
+                else
+                    ImGui::Text("Mode: User Defined Camera");
+
+                ofCamera* activeCamera = getActiveCamera();
+                ofVec3f up = activeCamera->getUpDir();
+                ofVec3f lookAt = activeCamera->getLookAtDir();
+                ImGui::Text("Look At: (%.2f, %.2f, %.2f)", lookAt.x, lookAt.y, lookAt.z);
+                ImGui::Text("Up: (%.2f, %2f, %.2f)", up.x, up.y, up.z);
+                ImGui::Text("Aspect Ratio: %.2f", activeCamera->getAspectRatio());
+
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+            if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+                previewType = A3_PREVIEW_REALTIME;
+
+            if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+                previewType = A3_PREVIEW_LOCAL;
+
+            if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+                previewType = A3_PREVIEW_IPC;
+
+            ImGui::EndMenu();
+        }
+
+        if(ImGui::BeginMenu("About"))
+        {
+            ImGui::Text("AtmosEditor is developed by GBB in 2017.");
+            if(ImGui::ImageButton((ImTextureID) (uintptr_t) logoButtonID, ImVec2(200, 200)))
+                a3Log::debug("And I guess no one would notice this passage.\n");
+
             ImGui::EndMenu();
         }
 
@@ -317,17 +441,20 @@ void ofApp::guiDraw()
 
     // -----------------------------------windows-----------------------------------
     modelWindow();
-    viewWindow();
     cameraWindow();
     lightWindow();
     shapeWindow();
     rendererWindow();
+    materialWindow();
+    textureWindow();
 
-    aboutWindow();
+    //viewWindow();
+    //aboutWindow();
 
     gui.end();
 }
 
+//--------------------------------------------------------------
 void ofApp::sendInitMessage()
 {
     a3EditorCameraData* data = cameraList[activeCameraIndex];
@@ -397,12 +524,17 @@ void ofApp::modelWindow()
     {
         ImGui::Begin("Models");
 
-        bool continued = true;
         for(vector<a3EditorModelData*>::iterator it = modelList.begin(); it != modelList.end();)
         {
+            bool continued = true;
+            a3EditorModelData* m= *it;
+
             if(ImGui::TreeNode((*it)->name.c_str()))
             {
-                IMGUI_BUTTON_DELETE_BEGIN("Models" + (*it)->name)
+                // select material
+                IMGUI_POPUP_SELECT_MATERIAL(m->name, m->materialIndex)
+
+                IMGUI_BUTTON_DELETE_BEGIN("Models" + m->name)
                     a3EditorModelData* temp = *it;
 
                     it = modelList.erase(it);
@@ -417,7 +549,7 @@ void ofApp::modelWindow()
             if(continued) it++;
         }
 
-        if(ImGui::Button(generateLabel("+", "Model").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+        if(ImGui::Button(generateLabel("+", "Model").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
         {
             ofFileDialogResult result = ofSystemLoadDialog("Import Model");
             if(result.bSuccess)
@@ -468,12 +600,12 @@ void ofApp::shapeWindow()
 
         for(vector<a3EditorShapeData*>::iterator it = shapeList.begin(); it != shapeList.end();)
         {
+            a3EditorShapeData* s = *it;
             bool continued = true;
 
-            a3EditorShapeData* s = *it;
             if(ImGui::TreeNode(s->name.c_str()))
             {
-                ImGui::TextWrapped(a3TypeToString(s->type).c_str());
+                ImGui::TextWrapped("Shape Type: %s", a3TypeToString(s->type).c_str());
 
                 switch(s->type)
                 {
@@ -497,6 +629,9 @@ void ofApp::shapeWindow()
                     break;
                 }
 
+                // select material
+                IMGUI_POPUP_SELECT_MATERIAL(s->name, s->materialIndex)
+
                 IMGUI_BUTTON_DELETE_BEGIN("Shape" + s->name)
                     it = shapeList.erase(it);
                     continued = false;
@@ -509,7 +644,7 @@ void ofApp::shapeWindow()
             if(continued) it++;
         }
 
-        if(ImGui::Button(generateLabel("+", "Shape").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+        if(ImGui::Button(generateLabel("+", "Shape").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
             ImGui::OpenPopup("Add Shape");
 
         if(ImGui::BeginPopupModal("Add Shape", NULL, ImGuiWindowFlags_AlwaysAutoResize))
@@ -566,7 +701,7 @@ void ofApp::lightWindow()
             a3EditorLightData* l = *it;
             if(ImGui::TreeNode(l->name.c_str()))
             {
-                ImGui::TextWrapped(a3TypeToString(l->type).c_str());
+                ImGui::TextWrapped("Light Type: %s", a3TypeToString(l->type).c_str());
 
                 switch(l->type)
                 {
@@ -584,37 +719,8 @@ void ofApp::lightWindow()
                 }
                 case A3_LIGHT_INFINITE_AREA:
                 {
-                    IMGUI_STYLE_BEGIN(2);
-                    if(ImGui::Button(generateLabel("Load Image", l->name).c_str()))
-                    {
-                        ofFileDialogResult result = ofSystemLoadDialog("Load Image");
-                        if(result.bSuccess)
-                        {
-                            // OF纹理render target是GL_TEXTURE_RECTANGLE_ARB。ImGui需要的是GL_TEXTURE_2D
-                            ofDisableArbTex();
-                            l->image.load(result.filePath); 
-                            ofEnableArbTex();
-                        }
-                    }
-                    IMGUI_STYLE_END();
-
-                    if(l->image.isAllocated())
-                    {
-                        ImGui::TextWrapped(("Path: " + string(l->imagePath)).c_str());
-                        float ratio = l->image.getWidth() / l->image.getHeight();
-                        float w = ImGui::GetContentRegionAvailWidth();
-                        GLuint a = l->image.getTexture().getTextureData().textureID;
-                        l->image.update();
-                        ImGui::Image((ImTextureID) (uintptr_t) a, ImVec2(w, w / ratio));
-                        //ImGui::Image((ImTextureID) (uintptr_t) l->imageIDi qu, ImVec2(w, w / ratio));
-                        //l->image.bind();
-                        //GLuint b = 6;
-                        //ImGui::Image((ImTextureID) (uintptr_t)b, ImVec2(w, w / ratio));
-                        //ImGui::ImageButton((ImTextureID) (uintptr_t) l->imageID, ImVec2(w, w / ratio));
-                        //ImGui::ImageButton((ImTextureID) (uintptr_t) a, ImVec2(w, w / ratio));
-                        //l->image.unbind();
-                    }
-
+                    // select a texture
+                    IMGUI_POPUP_SELECT_TEXTURE(l->name, l->textureIndex)
                     break;
                 }
                 case A3_LIGHT_SPOT:
@@ -652,7 +758,7 @@ void ofApp::lightWindow()
             if(continued) it++;
         }
 
-        if(ImGui::Button(generateLabel("+", "Light").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+        if(ImGui::Button(generateLabel("+", "Light").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
             ImGui::OpenPopup("Add Light");
         if(ImGui::BeginPopupModal("Add Light", NULL, ImGuiWindowFlags_AlwaysAutoResize))
         {
@@ -680,49 +786,49 @@ void ofApp::lightWindow()
 }
 
 //--------------------------------------------------------------
-void ofApp::viewWindow()
-{
-    if(openViewWindow)
-    {
-        ImGui::Begin("Views");
-
-        ImGui::TextWrapped("Preview Mode: %s", getPreviewModeName(previewType).c_str());
-        ImGui::TextWrapped("FPS:%.2f", ofGetFrameRate());
-        ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
-
-        ImGui::Separator();
-        if(ImGui::TreeNode("Preview Camera"))
-        {
-            if(freeCamPreview)
-                ImGui::TextWrapped("Mode: Free Camera");
-            else
-                ImGui::TextWrapped("Mode: User Defined Camera");
-
-            ofCamera* activeCamera = getActiveCamera();
-            ofVec3f up = activeCamera->getUpDir();
-            ofVec3f lookAt = activeCamera->getLookAtDir();
-            ImGui::TextWrapped("Look At: (%.2f, %.2f, %.2f)", lookAt.x, lookAt.y, lookAt.z);
-            ImGui::TextWrapped("Up: (%.2f, %2f, %.2f)", up.x, up.y, up.z);
-            ImGui::TextWrapped("Aspect Ratio: %.2f", activeCamera->getAspectRatio());
-
-            ImGui::TreePop();
-        }
-
-        ImGui::Separator();
-        if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
-            previewType = A3_PREVIEW_REALTIME;
-        //ImGui::SameLine();
-
-        if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
-            previewType = A3_PREVIEW_LOCAL;
-        //ImGui::SameLine();
-
-        if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
-            previewType = A3_PREVIEW_IPC;
-        
-        ImGui::End();
-    }
-}
+//void ofApp::viewWindow()
+//{
+//    if(openViewWindow)
+//    {
+//        ImGui::Begin("Views");
+//
+//        ImGui::TextWrapped("Preview Mode: %s", getPreviewModeName(previewType).c_str());
+//        ImGui::TextWrapped("FPS:%.2f", ofGetFrameRate());
+//        ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
+//
+//        ImGui::Separator();
+//        if(ImGui::TreeNode("Preview Camera"))
+//        {
+//            if(freeCamPreview)
+//                ImGui::TextWrapped("Mode: Free Camera");
+//            else
+//                ImGui::TextWrapped("Mode: User Defined Camera");
+//
+//            ofCamera* activeCamera = getActiveCamera();
+//            ofVec3f up = activeCamera->getUpDir();
+//            ofVec3f lookAt = activeCamera->getLookAtDir();
+//            ImGui::TextWrapped("Look At: (%.2f, %.2f, %.2f)", lookAt.x, lookAt.y, lookAt.z);
+//            ImGui::TextWrapped("Up: (%.2f, %2f, %.2f)", up.x, up.y, up.z);
+//            ImGui::TextWrapped("Aspect Ratio: %.2f", activeCamera->getAspectRatio());
+//
+//            ImGui::TreePop();
+//        }
+//
+//        ImGui::Separator();
+//        if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+//            previewType = A3_PREVIEW_REALTIME;
+//        //ImGui::SameLine();
+//
+//        if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+//            previewType = A3_PREVIEW_LOCAL;
+//        //ImGui::SameLine();
+//
+//        if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+//            previewType = A3_PREVIEW_IPC;
+//        
+//        ImGui::End();
+//    }
+//}
 
 //--------------------------------------------------------------
 void ofApp::cameraWindow()
@@ -746,9 +852,10 @@ void ofApp::cameraWindow()
 
         for(vector<a3EditorCameraData*>::iterator it = cameraList.begin(); it != cameraList.end();)
         {
+            a3EditorCameraData* c = *it;
             bool continued = true;
 
-            if(ImGui::TreeNode((*it)->name.c_str()))
+            if(ImGui::TreeNode(c->name.c_str()))
             {
                 //if(ImGui::Checkbox(generateLabel("Lock Mouse Input", it->name).c_str(), &it->lockMouseInput))
                 //{
@@ -759,52 +866,52 @@ void ofApp::cameraWindow()
                 //}
 
                 // active camera to preview
-                if(ImGui::Checkbox(generateLabel("Active", (*it)->name).c_str(), &(*it)->active))
+                if(ImGui::Checkbox(generateLabel("Active", c->name).c_str(), &c->active))
                 {
                     // 被激活摄像机索引
                     activeCameraIndex = it - cameraList.begin();
                 }
 
-                if(ImGui::DragFloat("Width", &(*it)->dimension[0], 1.0f, 1.0f, 1920.0f))
+                if(ImGui::DragFloat("Width", &c->dimension[0], 1.0f, 1.0f, 1920.0f))
                 {
-                    (*it)->camera->setAspectRatio((*it)->dimension[0] / (*it)->dimension[1]);
+                    c->camera->setAspectRatio(c->dimension[0] / c->dimension[1]);
                 }
 
-                if(ImGui::DragFloat("Height", &(*it)->dimension[1], 1.0f, 1.0f, 1080.0f))
+                if(ImGui::DragFloat("Height", &c->dimension[1], 1.0f, 1.0f, 1080.0f))
                 {
-                    (*it)->camera->setAspectRatio((*it)->dimension[0] / (*it)->dimension[1]);
+                    c->camera->setAspectRatio(c->dimension[0] / c->dimension[1]);
                 }
 
-                // camera or(*it)ation
-                //(*it)->lookAt = (*it)->camera->getLookAtDir();
-                if(ImGui::DragFloat3(generateLabel("Look At", (*it)->name).c_str(), &(*it)->lookat[0]))
+                // camera orcation
+                //c->lookAt = c->camera->getLookAtDir();
+                if(ImGui::DragFloat3(generateLabel("Look At", c->name).c_str(), &c->lookat[0]))
                 {
-                    (*it)->camera->lookAt(a3Float3ToVec3((*it)->lookat), a3Float3ToVec3(((*it)->up)));
+                    c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3((c->up)));
                 }
 
-                //(*it)->up = (*it)->camera->getUpDir();
-                if(ImGui::DragFloat3(generateLabel("Up", (*it)->name).c_str(), &(*it)->up[0]))
+                //c->up = c->camera->getUpDir();
+                if(ImGui::DragFloat3(generateLabel("Up", c->name).c_str(), &c->up[0]))
                 {
-                    (*it)->camera->lookAt(a3Float3ToVec3((*it)->lookat), a3Float3ToVec3((*it)->up));
+                    c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3(c->up));
                 }
 
-                a3Float3Set((*it)->origin, (*it)->camera->getPosition());
-                if(ImGui::DragFloat3(generateLabel("Origin", (*it)->name).c_str(), &(*it)->origin[0]))
+                a3Float3Set(c->origin, c->camera->getPosition());
+                if(ImGui::DragFloat3(generateLabel("Origin", c->name).c_str(), &c->origin[0]))
                 {
-                    (*it)->camera->setPosition(a3Float3ToVec3((*it)->origin));
+                    c->camera->setPosition(a3Float3ToVec3(c->origin));
                 }
 
                 // fov
-                (*it)->fov = (*it)->camera->getFov();
-                if(ImGui::DragFloat(generateLabel("FOV", (*it)->name).c_str(), &(*it)->fov, 1.0f, 1.0f, 180.0f))
+                c->fov = c->camera->getFov();
+                if(ImGui::DragFloat(generateLabel("FOV", c->name).c_str(), &c->fov, 1.0f, 1.0f, 180.0f))
                 {
-                    (*it)->camera->setFov((*it)->fov);
+                    c->camera->setFov(c->fov);
                 }
 
                 // 视锥体距离
-                ImGui::DragFloat(generateLabel("Distance", (*it)->name).c_str(), &(*it)->distance);
+                ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance);
 
-                IMGUI_BUTTON_DELETE_BEGIN("Camera" + (*it)->name)
+                IMGUI_BUTTON_DELETE_BEGIN("Camera" + c->name)
                     a3EditorCameraData* temp = *it;
 
                     it = cameraList.erase(it);
@@ -824,7 +931,7 @@ void ofApp::cameraWindow()
 
         ImGui::Separator();
 
-        if(ImGui::Button("Change Camera To Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+        if(ImGui::Button("Change Camera To Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
         {
             if(cameraList.size() <= 0)
             {
@@ -842,7 +949,7 @@ void ofApp::cameraWindow()
             }
         }
 
-        if(ImGui::Button(generateLabel("+", "Camera").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 30)))
+        if(ImGui::Button(generateLabel("+", "Camera").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
             ImGui::OpenPopup("Add Camera");
         if(ImGui::BeginPopupModal("Add Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize))
         {
@@ -911,7 +1018,7 @@ void ofApp::rendererWindow()
     }
 
     IMGUI_STYLE_BEGIN(2);
-    if(ImGui::Button(generateLabel("Select Save Image Path", "Renderer").c_str()))
+    if(ImGui::Button(generateLabel("Select Save Image Path", "Renderer").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
     {
         ofFileDialogResult result = ofSystemSaveDialog("1.png", "");
         if(result.bSuccess)
@@ -923,23 +1030,196 @@ void ofApp::rendererWindow()
 }
 
 //--------------------------------------------------------------
-void ofApp::aboutWindow()
+void ofApp::materialWindow()
 {
-    if(!openAboutWindow) return;
+    if(!openMaterialWindow) return;
 
-    ImGuiWindowFlags window_flags = 0;
-    ImGui::SetNextWindowSize(ofVec2f(400, 300), ImGuiSetCond_FirstUseEver);
-    if(ImGui::Begin("About", &openAboutWindow))
+    ImGui::Begin("Material");
+
+    for(vector<a3EditorMaterialData*>::iterator it = materialList.begin(); it != materialList.end();)
     {
-        ImGui::ImageButton((ImTextureID) (uintptr_t) logoButtonID, ImVec2(200, 200));
+        a3EditorMaterialData* m = *it;
+        bool continued = true;
+
+        if(ImGui::TreeNode(m->name.c_str()))
+        {
+            ImGui::TextWrapped("Material Type: %s", a3TypeToString(m->type).c_str());
+            ImGui::DragFloat3(generateLabel("R", "Material").c_str(), m->R);
+
+            if(m->textureIndex != -1)
+                ImGui::TextWrapped("Texture Name: %s", textureList[m->textureIndex]->name.c_str());
+
+            // select a texture
+            IMGUI_POPUP_SELECT_TEXTURE(m->name, m->textureIndex)
+
+            IMGUI_BUTTON_DELETE_BEGIN("Material" + m->name)
+                a3EditorMaterialData* temp = m;
+
+                it = materialList.erase(it);
+                continued = false;
+
+                A3_SAFE_DELETE(temp);
+            IMGUI_BUTTON_DELETE_END()
+
+            ImGui::TreePop();
+        }
+
+        if(continued)
+            it++;
+    }
+
+    // add matertial
+    if(ImGui::Button(generateLabel("+", "Material").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+        ImGui::OpenPopup("Add Material");
+    if(ImGui::BeginPopupModal("Add Material", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static int item = 0;
+        ImGui::Combo(generateLabel("Type", "Material").c_str(), &item, "Lambertian\0Mirror\0Glass\0");
+
+        if(ImGui::Button(generateLabel("OK", "Material").c_str(), ImVec2(120, 0)))
+        {
+            a3EditorMaterialData* data = new a3EditorMaterialData();
+            data->name = "Material";
+            data->name += ofToString(materialList.size());
+            data->type = (a3MaterialType) item;
+            materialList.push_back(data);
+
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::SameLine();
-        ImGui::Text("AtmosEditor is developed by GBB in 2017.");
-        ImGui::SameLine();
-        ImGui::Text("And I guess no one would notice this passage.");
+        if(ImGui::Button(generateLabel("Cancel", "Texture").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
     }
 
     ImGui::End();
 }
+
+//--------------------------------------------------------------
+void ofApp::textureWindow()
+{
+    if(!openTextureWindow) return;
+
+    ImGui::Begin("Texture");
+
+    for(vector<a3EditorTextureData*>::iterator it = textureList.begin(); it != textureList.end();)
+    {
+        a3EditorTextureData* t = *it;
+        bool continued = true;
+
+        if(ImGui::TreeNode(t->name.c_str()))
+        {
+            ImGui::TextWrapped("Texture Type: %s", a3TypeToString(t->type).c_str());
+
+            switch(t->type)
+            {
+            case A3_TEXTURE_IMAGE:
+            {
+                // load a image texture
+                IMGUI_STYLE_BEGIN(2);
+                if(ImGui::Button(generateLabel("Load Image", t->name).c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+                {
+                    ofFileDialogResult result = ofSystemLoadDialog("Load Image");
+                    if(result.bSuccess)
+                    {
+                        strcpy(t->imagePath, result.filePath.c_str());
+                        // OF纹理render target是GL_TEXTURE_RECTANGLE_ARB。ImGui需要的是GL_TEXTURE_2D
+                        ofDisableArbTex();
+                        t->image.load(result.filePath);
+                        ofEnableArbTex();
+                    }
+                }
+                IMGUI_STYLE_END();
+
+                // visualize
+                if(t->image.isAllocated())
+                {
+                    string pathContent = "Path: ";
+                    pathContent += t->imagePath;
+                    ImGui::TextWrapped(pathContent.c_str());
+                    float ratio = t->image.getWidth() / t->image.getHeight();
+                    float w = ImGui::GetContentRegionAvailWidth();
+                    GLuint a = t->image.getTexture().getTextureData().textureID;
+                    t->image.update();
+                    ImGui::Image((ImTextureID) (uintptr_t) a, ImVec2(w, w / ratio));
+                }
+                break;
+            }
+            case A3_TEXTURE_CONSTANT:
+            {
+                ImGui::DragFloat3(generateLabel("value", t->name).c_str(), t->value);
+                break;
+            }
+            case A3_TEXTURE_CHECKBOARD:
+            {
+                ImGui::DragFloat(generateLabel("t1", t->name).c_str(), &t->t1);
+                ImGui::DragFloat(generateLabel("t2", t->name).c_str(), &t->t2);
+
+                ImGui::DragFloat(generateLabel("level", t->name).c_str(), &t->level);
+                break;
+            }
+            }
+
+            // delete
+            IMGUI_BUTTON_DELETE_BEGIN("Texture" + t->name)
+                a3EditorTextureData* temp = t;
+
+                it = textureList.erase(it);
+                continued = false;
+
+                A3_SAFE_DELETE(temp);
+            IMGUI_BUTTON_DELETE_END()
+
+            ImGui::TreePop();
+        }
+
+        if(continued)
+            it++;
+    }
+
+    if(ImGui::Button(generateLabel("+", "Texture").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+        ImGui::OpenPopup("Add Texture");
+    if(ImGui::BeginPopupModal("Add Texture", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static int item = 0;
+        ImGui::Combo(generateLabel("Type", "Texture").c_str(), &item, "Image\0Constant\0Checkboard\0");
+
+        if(ImGui::Button(generateLabel("OK", "Texture").c_str(), ImVec2(120, 0)))
+        {
+            a3EditorTextureData* data = new a3EditorTextureData();
+            data->name = "Texture";
+            data->name += ofToString(textureList.size());
+            // 第一个类型为NULL
+            data->type = (a3TextureType) (item + 1);
+            textureList.push_back(data);
+
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button(generateLabel("Cancel", "Texture").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
+    }
+
+    ImGui::End();
+}
+
+//--------------------------------------------------------------
+//void ofApp::aboutWindow()
+//{
+//    if(!openAboutWindow) return;
+//
+//    ImGuiWindowFlags window_flags = 0;
+//    ImGui::SetNextWindowSize(ofVec2f(400, 300), ImGuiSetCond_FirstUseEver);
+//    if(ImGui::Begin("About", &openAboutWindow))
+//    {
+//        ImGui::ImageButton((ImTextureID) (uintptr_t) logoButtonID, ImVec2(200, 200));
+//        ImGui::SameLine();
+//        ImGui::Text("AtmosEditor is developed by GBB in 2017.");
+//        ImGui::SameLine();
+//        ImGui::Text("And I guess no one would notice this passage.");
+//    }
+//
+//    ImGui::End();
+//}
 
 //--------------------------------------------------------------
 ofCamera* ofApp::getActiveCamera()
