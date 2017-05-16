@@ -291,6 +291,8 @@ void ofApp::guiDraw()
 
             if(ImGui::MenuItem("Save", NULL)) { /*--! in the future*/ }
 
+            if(ImGui::MenuItem("Save As", NULL)) { /*--! in the future*/ }
+
             ImGui::EndMenu();
         }
 
@@ -300,47 +302,11 @@ void ofApp::guiDraw()
 
             if(ImGui::BeginMenu("Start IPC"))
             {
-                if(ImGui::MenuItem(generateLabel("Debug", "IPC").c_str()))
-                {
-                    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
-                    {
-                        a3Log::info("Start IPC Debug Rendering\n");
+                if(ImGui::MenuItem(generateLabel("Debug", "IPC").c_str(), "F4"))
+                    renderProvess(true);
 
-                        SHELLEXECUTEINFO shell = {sizeof(shell)};
-                        shell.fMask = SEE_MASK_FLAG_DDEWAIT;
-                        shell.lpVerb = L"open";
-                        shell.lpFile = atmosDebugEXEPath.c_str();
-                        shell.nShow = SW_SHOWNORMAL;
-                        BOOL ret = ShellExecuteEx(&shell);
-                        if(ret == TRUE)
-                            sendInitMessage();
-                        else
-                            a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
-                    }
-                    else
-                        a3Log::warning("IPC Render needs a camera to be actived\n");
-                }
-
-                if(ImGui::MenuItem(generateLabel("Release", "IPC").c_str()))
-                {
-                    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
-                    {
-                        a3Log::info("Start IPC Release Rendering\n");
-
-                        SHELLEXECUTEINFO shell = {sizeof(shell)};
-                        shell.fMask = SEE_MASK_FLAG_DDEWAIT;
-                        shell.lpVerb = L"open";
-                        shell.lpFile = atmosReleaseEXEPath.c_str();
-                        shell.nShow = SW_SHOWNORMAL;
-                        BOOL ret = ShellExecuteEx(&shell);
-                        if(ret == TRUE)
-                            sendInitMessage();
-                        else
-                            a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
-                    }
-                    else
-                        a3Log::warning("IPC Render needs a camera to be actived\n");
-                }
+                if(ImGui::MenuItem(generateLabel("Release", "IPC").c_str(), "F5"))
+                    renderProvess(false);
 
                 if(ImGui::MenuItem(generateLabel("Select Atmos Debug EXE...", "IPC").c_str()))
                 {
@@ -455,6 +421,31 @@ void ofApp::guiDraw()
 }
 
 //--------------------------------------------------------------
+void ofApp::renderProvess(bool isDebug)
+{
+    if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+    {
+        a3Log::info("Start IPC Debug Rendering\n");
+
+        SHELLEXECUTEINFO shell = {sizeof(shell)};
+        shell.fMask = SEE_MASK_FLAG_DDEWAIT;
+        shell.lpVerb = L"open";
+        if(isDebug)
+            shell.lpFile = atmosDebugEXEPath.c_str();
+        else
+            shell.lpFile = atmosReleaseEXEPath.c_str();
+        shell.nShow = SW_SHOWNORMAL;
+        BOOL ret = ShellExecuteEx(&shell);
+        if(ret == TRUE)
+            sendInitMessage();
+        else
+            a3Log::warning("Atmos core exe can't open, pls select an usable path.\n");
+    }
+    else
+        a3Log::warning("IPC Render needs a camera to be actived\n");
+}
+
+//--------------------------------------------------------------
 void ofApp::sendInitMessage()
 {
     a3EditorCameraData* data = cameraList[activeCameraIndex];
@@ -494,20 +485,45 @@ void ofApp::sendInitMessage()
     // models
     msg->modelListLength = modelList.size();
     for(int i = 0; i < modelList.size(); i++)
+    {
+        // init material
+        int index = modelList[i]->materialIndex;
+        if(index != -1)
+            modelList[i]->materialData = (a3MaterialData) *materialList[index];
+
         // operator =
         msg->modelList[i] = *modelList[i];
+    }
 
     // shapes
     msg->shapeListLength = shapeList.size();
     for(int i = 0; i < shapeList.size(); i++)
+    {
+        // init material
+        int index = shapeList[i]->materialIndex;
+        if(index != -1)
+            shapeList[i]->materialData = (a3MaterialData) *materialList[index];
+
         // operator =
         msg->shapeList[i] = *shapeList[i];
+    }
 
     // lights
     msg->lightListLength = lightList.size();
     for(int i = 0; i < lightList.size(); i++)
+    {
+        // init texture
+        int index = lightList[i]->textureIndex;
+        if(index != -1)
+        {
+            // image texture for image based lighting
+            if(lightList[i]->type == A3_LIGHT_INFINITE_AREA)
+                strcpy(lightList[i]->imagePath, textureList[i]->imagePath);
+        }
+
         // operator =
         msg->lightList[i] = *lightList[i];
+    }
 
     if(!ipcS2C.isFull())
         ipcS2C.enqueue(*msg);
@@ -719,6 +735,7 @@ void ofApp::lightWindow()
                 }
                 case A3_LIGHT_INFINITE_AREA:
                 {
+                    //--! For now only support image texture
                     // select a texture
                     IMGUI_POPUP_SELECT_TEXTURE(l->name, l->textureIndex)
                     break;
@@ -1044,7 +1061,7 @@ void ofApp::materialWindow()
         if(ImGui::TreeNode(m->name.c_str()))
         {
             ImGui::TextWrapped("Material Type: %s", a3TypeToString(m->type).c_str());
-            ImGui::DragFloat3(generateLabel("R", "Material").c_str(), m->R);
+            ImGui::DragFloat3(generateLabel("R", "Material").c_str(), m->R, 0.1f, 0.0f, 1.0f);
 
             if(m->textureIndex != -1)
                 ImGui::TextWrapped("Texture Name: %s", textureList[m->textureIndex]->name.c_str());
@@ -1257,7 +1274,10 @@ void ofApp::keyPressed(int key)
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key)
 {
-
+    if(key == OF_KEY_F4)
+        renderProvess(true);
+    else if(key == OF_KEY_F5)
+        renderProvess(false);
 }
 
 //--------------------------------------------------------------

@@ -35,6 +35,7 @@ public:
 
     void updateMQ();
     void guiDraw();
+    void renderProvess(bool isDebug);
     void sendInitMessage();
 
     // window
