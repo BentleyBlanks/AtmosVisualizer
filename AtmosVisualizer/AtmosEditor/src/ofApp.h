@@ -2,10 +2,15 @@
 
 #include "ofMain.h"
 #include "DrawUtils.h"
+
+// imgui
 #include "ofxImGui.h"
+#include "imgui_dock.h"
+
 #include "a3TypeData.h"
 #include "messageQueue/a3Message.h"
 #include "messageQueue/a3MessageQueueIPC.h"
+#include "a3EasyCam.h"
 
 enum a3PreviewType
 {
@@ -33,9 +38,10 @@ public:
     void dragEvent(ofDragInfo dragInfo);
     void gotMessage(ofMessage msg);
 
-    void updateMQ();
+    void guiSetup();
     void guiDraw();
-    void renderProvess(bool isDebug);
+    void updateMQ();
+    void startRenderingProvess(bool isDebug);
     void sendInitMessage();
 
     // window
@@ -57,21 +63,30 @@ public:
     // camera
     ofCamera* getActiveCamera();
     a3EditorCameraData* getActiveCameraData();
+    ofFbo* getPreviewFbo();
 
     // editor
-    ofxImGui::Gui gui; 
+    ofxImGui::Gui gui;
+    ImGuiDock::Dockspace dockspace;
+    ImGuiDock::Dock rendererDock, cameraDock, modelDock,
+                    sceneDock, previewDock, offlineResultDock,
+                    materialDock, textureDock, 
+                    shapeDock, lightDock;
+
     // bool openViewWindow;
-    bool openCameraWindow, openShapeWindow, openLightWindow, openModelWindow, 
-         openAboutWindow, openRendererWindow, openMaterialWindow, openTextureWindow;
+    //bool openCameraWindow, openShapeWindow, openLightWindow, openModelWindow, 
+    //     openAboutWindow, openRendererWindow, openMaterialWindow, openTextureWindow;
 
     ofImage logo;
     GLuint logoButtonID;
 
     // preview
     Graph3D* ground;
-    ofEasyCam freeCam;
+    //ofEasyCam freeCam;
+    a3EasyCam freeCam;
     a3MessageQueueIPC ipcC2S, ipcS2C;
-    ofFbo ipcFbo;
+    ofFbo sceneFbo, previewFbo, ipcFbo;
+    ImVec2 previewContentRegion;
 
     // light
     vector<a3EditorLightData*> lightList;
@@ -94,7 +109,7 @@ public:
     // true freecam; false userdefined camera
     bool freeCamPreview;
     a3PreviewType previewType;
-    bool fullScreenIPCPreview;
+    //bool fullScreenIPCPreview;
 
     // shape
     vector<a3EditorShapeData*> shapeList;

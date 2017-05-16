@@ -111,13 +111,29 @@ string getPreviewModeName(a3PreviewType type)
     }
 }
 
+void reallocateFbo(ofFbo* fbo, int width, int height, int numSamples = 0)
+{
+    if(!fbo) return;
+
+    if(width <= 0 || height <= 0) return;
+
+    if(!fbo->isAllocated() ||
+       fbo->getWidth() != width ||
+       fbo->getHeight() != height)
+    {
+        // no need to clear
+        ofDisableArbTex();
+        fbo->allocate(width, height, GL_RGBA, numSamples);
+        ofEnableArbTex();
+    }
+}
+
 //--------------------------------------------------------------
 void ofApp::setup()
 {
     ofEnableDepthTest();
-    ofSetFrameRate(60);
-
-    gui.setup();
+    ofSetFrameRate(60); \
+        ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
 
     freeCamPreview = true;
     freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, -1, 0));
@@ -129,16 +145,16 @@ void ofApp::setup()
 
     ipcS2C.init(L"Who's Your Daddy S2C", true, msgMaxNum / 2, S2CMsgSize);
     ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, C2SMsgSize);
-    fullScreenIPCPreview = false;
+    //fullScreenIPCPreview = false;
 
     // window
-    openCameraWindow = true;
-    openShapeWindow = true;
-    openLightWindow = true;
-    openModelWindow = true;
-    openRendererWindow = true;
-    openMaterialWindow = true;
-    openTextureWindow = true;
+    //openCameraWindow = true;
+    //openShapeWindow = true;
+    //openLightWindow = true;
+    //openModelWindow = true;
+    //openRendererWindow = true;
+    //openMaterialWindow = true;
+    //openTextureWindow = true;
     //openViewWindow = true;
     //openAboutWindow = false;
 
@@ -158,7 +174,7 @@ void ofApp::setup()
     gridLevel[0] = 16;
     gridLevel[1] = 16;
 
-    ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
+    guiSetup();
 }
 
 //--------------------------------------------------------------
@@ -192,7 +208,7 @@ void ofApp::updateMQ()
                 pixels.setFromPixels(msg->buffer, msg->gridWidth, msg->gridHeight, OF_IMAGE_COLOR);
                 ofFloatImage img(pixels);
 
-                ipcFbo.begin(); 
+                ipcFbo.begin();
                 img.draw(msg->gridX, msg->gridY);
                 ipcFbo.end();
                 break;
@@ -221,15 +237,28 @@ void ofApp::draw()
     }
 
     guiDraw();
+
+    // -----------------------------------mouse pos-----------------------------------
+    //string mousePos = "[x:";
+    //mousePos += ofToString(ofGetMouseX());
+    //mousePos += ", y:";
+    //mousePos += ofToString(ofGetMouseY());
+    //mousePos += "]";
+    //ofDrawBitmapString(mousePos.c_str(), ofGetMouseX(), ofGetMouseY());
 }
 
 //--------------------------------------------------------------
 void ofApp::realtimePreview()
 {
-    ofBackground(65, 65, 85);
+    ofFbo* fbo = getPreviewFbo();
+    if(!fbo) return;
+
+    fbo->begin();
+
+    ofBackground(45, 45, 57);
 
     // -----------------------------------cam begin-----------------------------------
-    getActiveCamera()->begin();
+    getActiveCamera()->begin(ofRectangle(0, 0, fbo->getWidth(), fbo->getHeight()));
 
     // 左手坐标系
     float axisLength = 550;
@@ -257,6 +286,8 @@ void ofApp::realtimePreview()
 
     // -----------------------------------cam end-----------------------------------
     getActiveCamera()->end();
+
+    fbo->end();
 }
 
 //--------------------------------------------------------------
@@ -269,12 +300,136 @@ void ofApp::localPreview()
 //--------------------------------------------------------------
 void ofApp::ipcPreview()
 {
-    //ofBackground(65, 85, 65);
-    //ofDrawBitmapString("IPC Preview", ofPoint(ofGetWindowWidth() / 2.0f, ofGetWindowHeight() / 2.0f));
-    if(!fullScreenIPCPreview)
-        ipcFbo.draw(ofGetWidth() / 2 - ipcFbo.getWidth() / 2, ofGetHeight() / 2 - ipcFbo.getHeight() / 2);
-    else
-        ipcFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
+    //if(!fullScreenIPCPreview)
+    //    ipcFbo.draw(ofGetWidth() / 2 - ipcFbo.getWidth() / 2, ofGetHeight() / 2 - ipcFbo.getHeight() / 2);
+    //else
+    //    ipcFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
+}
+
+void ofApp::guiSetup()
+{
+    gui.setup();
+
+    // imgui style
+    ImGuiStyle* style = &ImGui::GetStyle();
+
+    style->WindowRounding = 0.0f;
+    style->FrameRounding = 0.0f;
+    style->GrabRounding = 0.0f;
+    style->ScrollbarRounding = 0.0f;
+
+    //style->WindowMinSize = ImVec2(160, 65);
+    //style->FramePadding = ImVec2(4, 2);
+    //style->ItemSpacing = ImVec2(6, 2);
+    //style->ItemInnerSpacing = ImVec2(6, 4);
+    //style->Alpha = 1.0f;
+    //style->IndentSpacing = 6.0f;
+    //style->ItemInnerSpacing = ImVec2(2, 4);
+    //style->ColumnsMinSpacing = 50.0f;
+    //style->GrabMinSize = 14.0f;
+    //style->ScrollbarSize = 12.0f;
+
+    // left
+    rendererDock.initialize("Renderer", true, ImVec2(), [this](ImVec2 area)
+    {
+        rendererWindow();
+    });
+
+    cameraDock.initialize("Camera", true, ImVec2(), [this](ImVec2 area)
+    {
+        cameraWindow();
+    });
+
+    modelDock.initialize("Model", true, ImVec2(), [this](ImVec2 area)
+    {
+        modelWindow();
+    });
+
+    // middle
+    sceneDock.initialize("Scene", true, ImVec2(), [this](ImVec2 area)
+    {
+        previewType = A3_PREVIEW_REALTIME;
+        freeCamPreview = true;
+
+        ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+        // reallocate
+        reallocateFbo(&sceneFbo, contentRegion.x, contentRegion.y, 4);
+
+        // realtime rendering preview
+        ImGui::Image((ImTextureID) (uintptr_t) sceneFbo.getTexture().getTextureData().textureID, ImVec2(sceneFbo.getWidth(), sceneFbo.getHeight()));
+    });
+
+    previewDock.initialize("Preview", true, ImVec2(), [this](ImVec2 area)
+    {
+        // active camera preview 
+        freeCamPreview = false;
+
+        ofVec2f d(previewFbo.getWidth(), previewFbo.getHeight());
+        if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+            d = cameraList[activeCameraIndex]->dimension;
+        else return;
+
+        // reallocate
+        reallocateFbo(&previewFbo, d.x, d.y, 4);
+
+        // realtime rendering preview
+        ImGui::Image((ImTextureID) (uintptr_t) previewFbo.getTexture().getTextureData().textureID, ImVec2(previewFbo.getWidth(), previewFbo.getHeight()));
+    });
+
+    offlineResultDock.initialize("Result", true, ImVec2(), [this](ImVec2 area)
+    {
+        // ipc renderer image
+        previewType = A3_PREVIEW_IPC;
+
+        ofVec2f d(ipcFbo.getWidth(), ipcFbo.getHeight());
+        if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+            d = cameraList[activeCameraIndex]->dimension;
+        else return;
+
+        // reallocate
+        reallocateFbo(&ipcFbo, d.x, d.y);
+
+        // realtime rendering preview
+        ImGui::Image((ImTextureID) (uintptr_t) ipcFbo.getTexture().getTextureData().textureID, ImVec2(ipcFbo.getWidth(), ipcFbo.getHeight()));
+    });
+
+    // bottom
+    materialDock.initialize("Material", true, ImVec2(), [this](ImVec2 area)
+    {
+        materialWindow();
+    });
+
+    textureDock.initialize("Texture", true, ImVec2(), [this](ImVec2 area)
+    {
+        textureWindow();
+    });
+
+    // right
+    shapeDock.initialize("Shape", true, ImVec2(), [this](ImVec2 area)
+    {
+        shapeWindow();
+    });
+
+    lightDock.initialize("Light", true, ImVec2(), [this](ImVec2 area)
+    {
+        lightWindow();
+    });
+
+    int width = ofGetWidth(), height = ofGetHeight();
+
+    dockspace.dock(&rendererDock, ImGuiDock::DockSlot::Left, 0.25 * width, true);
+    dockspace.dockWith(&sceneDock, &rendererDock, ImGuiDock::DockSlot::Right, 0.7 * width, true);
+    dockspace.dockWith(&previewDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
+    dockspace.dockWith(&offlineResultDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
+
+    dockspace.dockWith(&cameraDock, &rendererDock, ImGuiDock::DockSlot::Bottom, 0.6 * height, true);
+    dockspace.dockWith(&modelDock, &cameraDock, ImGuiDock::DockSlot::Tab, 0, false);
+
+    dockspace.dock(&shapeDock, ImGuiDock::DockSlot::Right, 0.15 * width, true);
+    dockspace.dockWith(&lightDock, &shapeDock, ImGuiDock::DockSlot::Tab, 0, false);
+
+    dockspace.dockWith(&materialDock, &shapeDock, ImGuiDock::DockSlot::Bottom, 0.5 * height, false);
+    dockspace.dockWith(&textureDock, &materialDock, ImGuiDock::DockSlot::Tab, 0, true);
 }
 
 //--------------------------------------------------------------
@@ -303,10 +458,10 @@ void ofApp::guiDraw()
             if(ImGui::BeginMenu("Start IPC"))
             {
                 if(ImGui::MenuItem(generateLabel("Debug", "IPC").c_str(), "F4"))
-                    renderProvess(true);
+                    startRenderingProvess(true);
 
                 if(ImGui::MenuItem(generateLabel("Release", "IPC").c_str(), "F5"))
-                    renderProvess(false);
+                    startRenderingProvess(false);
 
                 if(ImGui::MenuItem(generateLabel("Select Atmos Debug EXE...", "IPC").c_str()))
                 {
@@ -334,33 +489,32 @@ void ofApp::guiDraw()
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("Window"))
-        {
-            if(ImGui::MenuItem(getWindowToggleName("Shape", openShapeWindow).c_str(), NULL)) { openShapeWindow = !openShapeWindow; }
-
-            if(ImGui::MenuItem(getWindowToggleName("Light", openLightWindow).c_str(), NULL)) { openLightWindow = !openLightWindow; }
-
-            if(ImGui::MenuItem(getWindowToggleName("Model", openModelWindow).c_str(), NULL)) { openModelWindow = !openModelWindow; }
-
-            //if(ImGui::MenuItem(getWindowToggleName("View", openViewWindow).c_str(), NULL)) { openViewWindow = !openViewWindow; }
-
-            if(ImGui::MenuItem(getWindowToggleName("Camera", openCameraWindow).c_str(), NULL)) { openCameraWindow = !openCameraWindow; }
-
-            if(ImGui::MenuItem(getWindowToggleName("Renderer", openRendererWindow).c_str(), NULL)) { openRendererWindow = !openRendererWindow; }
-
-            if(ImGui::MenuItem(getWindowToggleName("Material", openMaterialWindow).c_str(), NULL)) { openMaterialWindow = !openMaterialWindow; }
-
-            if(ImGui::MenuItem(getWindowToggleName("Texture", openTextureWindow).c_str(), NULL)) { openTextureWindow = !openTextureWindow; }
-            
-            ImGui::EndMenu();
-        }
+        //if(ImGui::BeginMenu("Window"))
+        //{
+        //    if(ImGui::MenuItem(getWindowToggleName("Shape", openShapeWindow).c_str(), NULL)) { openShapeWindow = !openShapeWindow; }
+        //
+        //    if(ImGui::MenuItem(getWindowToggleName("Light", openLightWindow).c_str(), NULL)) { openLightWindow = !openLightWindow; }
+        //
+        //    if(ImGui::MenuItem(getWindowToggleName("Model", openModelWindow).c_str(), NULL)) { openModelWindow = !openModelWindow; }
+        //
+        //    //if(ImGui::MenuItem(getWindowToggleName("View", openViewWindow).c_str(), NULL)) { openViewWindow = !openViewWindow; }
+        //
+        //    if(ImGui::MenuItem(getWindowToggleName("Camera", openCameraWindow).c_str(), NULL)) { openCameraWindow = !openCameraWindow; }
+        //
+        //    if(ImGui::MenuItem(getWindowToggleName("Renderer", openRendererWindow).c_str(), NULL)) { openRendererWindow = !openRendererWindow; }
+        //
+        //    if(ImGui::MenuItem(getWindowToggleName("Material", openMaterialWindow).c_str(), NULL)) { openMaterialWindow = !openMaterialWindow; }
+        //
+        //    if(ImGui::MenuItem(getWindowToggleName("Texture", openTextureWindow).c_str(), NULL)) { openTextureWindow = !openTextureWindow; }
+        //    
+        //    ImGui::EndMenu();
+        //}
 
         // 替代View Window 为腾出空间给材质编辑Window
         if(ImGui::BeginMenu("View"))
         {
-            ImGui::Text("Preview Mode: %s", getPreviewModeName(previewType).c_str());
-            ImGui::Text("FPS:%.2f", ofGetFrameRate());
-            ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
+            //ImGui::Text("Preview Mode: %s", getPreviewModeName(previewType).c_str());
+            //ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
 
             ImGui::Separator();
             if(ImGui::TreeNode("Preview Camera"))
@@ -380,15 +534,15 @@ void ofApp::guiDraw()
                 ImGui::TreePop();
             }
 
-            ImGui::Separator();
-            if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-                previewType = A3_PREVIEW_REALTIME;
-
-            if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-                previewType = A3_PREVIEW_LOCAL;
-
-            if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-                previewType = A3_PREVIEW_IPC;
+            //ImGui::Separator();
+            //if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+            //    previewType = A3_PREVIEW_REALTIME;
+            //
+            //if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+            //    previewType = A3_PREVIEW_LOCAL;
+            //
+            //if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+            //    previewType = A3_PREVIEW_IPC;
 
             ImGui::EndMenu();
         }
@@ -402,18 +556,35 @@ void ofApp::guiDraw()
             ImGui::EndMenu();
         }
 
+        ImGui::Text("FPS: %d", (int) ofGetFrameRate());
+
         ImGui::EndMainMenuBar();
     }
 
-    // -----------------------------------windows-----------------------------------
-    modelWindow();
-    cameraWindow();
-    lightWindow();
-    shapeWindow();
-    rendererWindow();
-    materialWindow();
-    textureWindow();
+    static bool openAllUI = true;
+    ImGuiWindowFlags window_flags = 0;
+    window_flags |= ImGuiWindowFlags_NoTitleBar;
+    window_flags |= ImGuiWindowFlags_NoResize;
+    window_flags |= ImGuiWindowFlags_NoMove;
 
+    // --!hard coded, can't get it
+    int menuHeight = 22;
+    int width = ofGetWidth(), height = ofGetHeight();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, menuHeight));
+    ImGui::SetNextWindowSize(ImVec2(width, height - menuHeight));
+
+    ImGui::Begin("All UI Widgets", &openAllUI, ImVec2(), 1.0f, window_flags);
+    dockspace.updateAndDraw(ImGui::GetContentRegionAvail());
+    ImGui::End();
+
+    // -----------------------------------windows-----------------------------------
+    //modelWindow();
+    //cameraWindow();
+    //lightWindow();
+    //shapeWindow();
+    //rendererWindow();
+    //materialWindow();
+    //textureWindow();
     //viewWindow();
     //aboutWindow();
 
@@ -421,7 +592,7 @@ void ofApp::guiDraw()
 }
 
 //--------------------------------------------------------------
-void ofApp::renderProvess(bool isDebug)
+void ofApp::startRenderingProvess(bool isDebug)
 {
     if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
     {
@@ -448,13 +619,22 @@ void ofApp::renderProvess(bool isDebug)
 //--------------------------------------------------------------
 void ofApp::sendInitMessage()
 {
+    if(activeCameraIndex < 0 || activeCameraIndex >= cameraList.size())
+    {
+        a3Log::warning("IPC Render needs a camera to be actived\n");
+        return;
+    }
+
     a3EditorCameraData* data = cameraList[activeCameraIndex];
 
-    if(ipcFbo.isAllocated())
-        ipcFbo.clear();
+    //if(ipcFbo.isAllocated())
+    //    ipcFbo.clear();
 
     // init the grid preview fbo
+    ofDisableArbTex();
     ipcFbo.allocate(data->dimension.x, data->dimension.y, GL_RGBA);
+    ofEnableArbTex();
+
     ipcFbo.begin();
     ofClear(255, 255, 255);
     ipcFbo.end();
@@ -536,270 +716,270 @@ void ofApp::sendInitMessage()
 //--------------------------------------------------------------
 void ofApp::modelWindow()
 {
-    if(openModelWindow)
+    //if(openModelWindow)
+    //{
+    //    ImGui::Begin("Models");
+
+    for(vector<a3EditorModelData*>::iterator it = modelList.begin(); it != modelList.end();)
     {
-        ImGui::Begin("Models");
+        bool continued = true;
+        a3EditorModelData* m = *it;
 
-        for(vector<a3EditorModelData*>::iterator it = modelList.begin(); it != modelList.end();)
+        if(ImGui::TreeNode((*it)->name.c_str()))
         {
-            bool continued = true;
-            a3EditorModelData* m= *it;
-
-            if(ImGui::TreeNode((*it)->name.c_str()))
-            {
-                // select material
-                IMGUI_POPUP_SELECT_MATERIAL(m->name, m->materialIndex)
+            // select material
+            IMGUI_POPUP_SELECT_MATERIAL(m->name, m->materialIndex)
 
                 IMGUI_BUTTON_DELETE_BEGIN("Models" + m->name)
-                    a3EditorModelData* temp = *it;
+                a3EditorModelData* temp = *it;
 
-                    it = modelList.erase(it);
-                    continued = false;
+            it = modelList.erase(it);
+            continued = false;
 
-                    A3_SAFE_DELETE(temp);
-                IMGUI_BUTTON_DELETE_END()
+            A3_SAFE_DELETE(temp);
+            IMGUI_BUTTON_DELETE_END()
 
                 ImGui::TreePop();
-            }
-
-            if(continued) it++;
         }
 
-        if(ImGui::Button(generateLabel("+", "Model").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-        {
-            ofFileDialogResult result = ofSystemLoadDialog("Import Model");
-            if(result.bSuccess)
-            {
-                ofxAssimpModelLoader* loader = new ofxAssimpModelLoader();
-                if(loader->loadModel(result.filePath))
-                {
-                    bool find = false;
-                    for(auto m : modelList)
-                    {
-                        if(result.fileName == m->name)
-                        {
-                            find = true;
-                            break;
-                        }
-                    }
+        if(continued) it++;
+    }
 
-                    if(!find)
+    if(ImGui::Button(generateLabel("+", "Model").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+    {
+        ofFileDialogResult result = ofSystemLoadDialog("Import Model");
+        if(result.bSuccess)
+        {
+            ofxAssimpModelLoader* loader = new ofxAssimpModelLoader();
+            if(loader->loadModel(result.filePath))
+            {
+                bool find = false;
+                for(auto m : modelList)
+                {
+                    if(result.fileName == m->name)
                     {
-                        a3Log::success("Successfully loded model:%s\n", result.filePath.c_str());
-                        a3EditorModelData* data = new a3EditorModelData(loader, result.filePath, result.fileName);
-                        modelList.push_back(data);
+                        find = true;
+                        break;
                     }
-                    else
-                    {
-                        a3Log::error("Model Named:%s exsited\n", result.filePath.c_str());
-                        A3_SAFE_DELETE(loader);
-                    }
+                }
+
+                if(!find)
+                {
+                    a3Log::success("Successfully loded model:%s\n", result.filePath.c_str());
+                    a3EditorModelData* data = new a3EditorModelData(loader, result.filePath, result.fileName);
+                    modelList.push_back(data);
                 }
                 else
                 {
-                    a3Log::error("Failed to load model:%s\n", result.filePath.c_str());
+                    a3Log::error("Model Named:%s exsited\n", result.filePath.c_str());
                     A3_SAFE_DELETE(loader);
                 }
             }
+            else
+            {
+                a3Log::error("Failed to load model:%s\n", result.filePath.c_str());
+                A3_SAFE_DELETE(loader);
+            }
         }
-
-        ImGui::End();
     }
+
+    //    ImGui::End();
+    //}
 }
 
 //--------------------------------------------------------------
 void ofApp::shapeWindow()
 {
-    if(openShapeWindow)
+    //if(openShapeWindow)
+    //{
+    //    ImGui::Begin("Shapes");
+
+    for(vector<a3EditorShapeData*>::iterator it = shapeList.begin(); it != shapeList.end();)
     {
-        ImGui::Begin("Shapes");
+        a3EditorShapeData* s = *it;
+        bool continued = true;
 
-        for(vector<a3EditorShapeData*>::iterator it = shapeList.begin(); it != shapeList.end();)
+        if(ImGui::TreeNode(s->name.c_str()))
         {
-            a3EditorShapeData* s = *it;
-            bool continued = true;
+            ImGui::TextWrapped("Shape Type: %s", a3TypeToString(s->type).c_str());
 
-            if(ImGui::TreeNode(s->name.c_str()))
+            switch(s->type)
             {
-                ImGui::TextWrapped("Shape Type: %s", a3TypeToString(s->type).c_str());
+            case A3_SHAPE_SPHERE:
+            {
+                if(ImGui::DragFloat(generateLabel("Radius", s->name).c_str(), &s->radius))
+                    s->sphere->setRadius(s->radius);
 
-                switch(s->type)
-                {
-                case A3_SHAPE_SPHERE:
-                {
-                    if(ImGui::DragFloat(generateLabel("Radius", s->name).c_str(), &s->radius))
-                        s->sphere->setRadius(s->radius);
-                    
-                    if(ImGui::DragFloat3(generateLabel("Position", s->name).c_str(), &s->position[0]))
-                        s->sphere->setPosition(a3Float3ToVec3(s->position));
+                if(ImGui::DragFloat3(generateLabel("Position", s->name).c_str(), &s->position[0]))
+                    s->sphere->setPosition(a3Float3ToVec3(s->position));
 
-                    break;
-                }
-                case A3_SHAPE_DISK:
-                    break;
-                case A3_SHAPE_PLANE:
-                    break;
-                case A3_SHAPE_TRIANGLE:
-                    break;
-                case A3_SHAPE_INFINITE_PLANE:
-                    break;
-                }
+                break;
+            }
+            case A3_SHAPE_DISK:
+                break;
+            case A3_SHAPE_PLANE:
+                break;
+            case A3_SHAPE_TRIANGLE:
+                break;
+            case A3_SHAPE_INFINITE_PLANE:
+                break;
+            }
 
-                // select material
-                IMGUI_POPUP_SELECT_MATERIAL(s->name, s->materialIndex)
+            // select material
+            IMGUI_POPUP_SELECT_MATERIAL(s->name, s->materialIndex)
 
                 IMGUI_BUTTON_DELETE_BEGIN("Shape" + s->name)
-                    it = shapeList.erase(it);
-                    continued = false;
-                    A3_SAFE_DELETE(s);
-                IMGUI_BUTTON_DELETE_END()
+                it = shapeList.erase(it);
+            continued = false;
+            A3_SAFE_DELETE(s);
+            IMGUI_BUTTON_DELETE_END()
 
                 ImGui::TreePop();
-            }
-
-            if(continued) it++;
         }
 
-        if(ImGui::Button(generateLabel("+", "Shape").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-            ImGui::OpenPopup("Add Shape");
-
-        if(ImGui::BeginPopupModal("Add Shape", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            static int item = 0;
-            ImGui::Combo(generateLabel("Type", "Shape").c_str(), &item, "Sphere\0Disk\0Plane\0Triangle\0InfinityPlane\0");
-
-            if(ImGui::Button(generateLabel("Ok", "Shape").c_str(), ImVec2(120, 0))) 
-            {
-                a3EditorShapeData* data = new a3EditorShapeData();
-                data->type = (a3ShapeType)item;
-                data->name = "Shape" + ofToString(shapeList.size());
-                switch(data->type)
-                {
-                case A3_SHAPE_SPHERE:
-                    data->sphere = new ofSpherePrimitive();
-                    break;
-                case A3_SHAPE_DISK:
-                    break;
-                case A3_SHAPE_PLANE:
-                    data->plane = new ofPlanePrimitive();
-                    break;
-                case A3_SHAPE_TRIANGLE:
-                    break;
-                case A3_SHAPE_INFINITE_PLANE:
-                    break;
-                }
-
-                shapeList.push_back(data);
-
-                ImGui::CloseCurrentPopup(); 
-            }
-
-            ImGui::SameLine();
-            if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-            ImGui::EndPopup();
-        }
-
-        ImGui::End();
+        if(continued) it++;
     }
+
+    if(ImGui::Button(generateLabel("+", "Shape").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+        ImGui::OpenPopup("Add Shape");
+
+    if(ImGui::BeginPopupModal("Add Shape", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static int item = 0;
+        ImGui::Combo(generateLabel("Type", "Shape").c_str(), &item, "Sphere\0Disk\0Plane\0Triangle\0InfinityPlane\0");
+
+        if(ImGui::Button(generateLabel("Ok", "Shape").c_str(), ImVec2(120, 0)))
+        {
+            a3EditorShapeData* data = new a3EditorShapeData();
+            data->type = (a3ShapeType) item;
+            data->name = "Shape" + ofToString(shapeList.size());
+            switch(data->type)
+            {
+            case A3_SHAPE_SPHERE:
+                data->sphere = new ofSpherePrimitive();
+                break;
+            case A3_SHAPE_DISK:
+                break;
+            case A3_SHAPE_PLANE:
+                data->plane = new ofPlanePrimitive();
+                break;
+            case A3_SHAPE_TRIANGLE:
+                break;
+            case A3_SHAPE_INFINITE_PLANE:
+                break;
+            }
+
+            shapeList.push_back(data);
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
+    }
+    /*
+            ImGui::End();
+        }*/
 }
 
 //--------------------------------------------------------------
 void ofApp::lightWindow()
 {
-    if(openLightWindow)
+    //if(openLightWindow)
+    //{
+    //    ImGui::Begin("Lights");
+
+    for(vector<a3EditorLightData*>::iterator it = lightList.begin(); it != lightList.end();)
     {
-        ImGui::Begin("Lights");
+        bool continued = true;
 
-        for(vector<a3EditorLightData*>::iterator it = lightList.begin(); it != lightList.end();)
+        a3EditorLightData* l = *it;
+        if(ImGui::TreeNode(l->name.c_str()))
         {
-            bool continued = true;
+            ImGui::TextWrapped("Light Type: %s", a3TypeToString(l->type).c_str());
 
-            a3EditorLightData* l = *it;
-            if(ImGui::TreeNode(l->name.c_str()))
+            switch(l->type)
             {
-                ImGui::TextWrapped("Light Type: %s", a3TypeToString(l->type).c_str());
+            case A3_LIGHT_POINT:
+            {
+                ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
+                ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), l->position);
 
-                switch(l->type)
-                {
-                case A3_LIGHT_POINT:
-                {
-                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
-                    ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), l->position);
-
+                break;
+            }
+            case A3_LIGHT_AREA:
+            {
+                ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
+                break;
+            }
+            case A3_LIGHT_INFINITE_AREA:
+            {
+                //--! For now only support image texture
+                // select a texture
+                IMGUI_POPUP_SELECT_TEXTURE(l->name, l->textureIndex)
                     break;
-                }
-                case A3_LIGHT_AREA:
-                {
-                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
-                    break;
-                }
-                case A3_LIGHT_INFINITE_AREA:
-                {
-                    //--! For now only support image texture
-                    // select a texture
-                    IMGUI_POPUP_SELECT_TEXTURE(l->name, l->textureIndex)
-                    break;
-                }
-                case A3_LIGHT_SPOT:
-                {
-                    // all light needs emmission settings
-                    ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
+            }
+            case A3_LIGHT_SPOT:
+            {
+                // all light needs emmission settings
+                ImGui::DragFloat3(generateLabel("Emission", l->name).c_str(), l->emission);
 
-                    if(ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), l->position))
-                        l->updatePosition();
+                if(ImGui::DragFloat3(generateLabel("Position", l->name).c_str(), l->position))
+                    l->updatePosition();
 
-                    ImGui::DragFloat3(generateLabel("Direction", l->name).c_str(), l->direction);
+                ImGui::DragFloat3(generateLabel("Direction", l->name).c_str(), l->direction);
 
-                    ImGui::DragFloat(generateLabel("Cone Angle", l->name).c_str(), &l->coneAngle);
+                ImGui::DragFloat(generateLabel("Cone Angle", l->name).c_str(), &l->coneAngle);
 
-                    ImGui::DragFloat(generateLabel("Falloff Start", l->name).c_str(), &l->falloffStart);
+                ImGui::DragFloat(generateLabel("Falloff Start", l->name).c_str(), &l->falloffStart);
 
-                    // display
-                    ImGui::DragFloat(generateLabel("Cone Height", l->name).c_str(), &l->coneHeight);
+                // display
+                ImGui::DragFloat(generateLabel("Cone Height", l->name).c_str(), &l->coneHeight);
 
-                    break;
-                }
-                default:
-                    break;
-                }
+                break;
+            }
+            default:
+                break;
+            }
 
-                IMGUI_BUTTON_DELETE_BEGIN("Light" + l->name)
-                    it = lightList.erase(it);
-                    continued = false;
-                    A3_SAFE_DELETE(l);
-                IMGUI_BUTTON_DELETE_END()
+            IMGUI_BUTTON_DELETE_BEGIN("Light" + l->name)
+                it = lightList.erase(it);
+            continued = false;
+            A3_SAFE_DELETE(l);
+            IMGUI_BUTTON_DELETE_END()
 
                 ImGui::TreePop();
-            }
-
-            if(continued) it++;
         }
 
-        if(ImGui::Button(generateLabel("+", "Light").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-            ImGui::OpenPopup("Add Light");
-        if(ImGui::BeginPopupModal("Add Light", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            static int item = 0;
-            ImGui::Combo(generateLabel("Type", "Light").c_str(), &item, "Point Light\0Area Light\0Infinite Area Light\0Spot Light\0");
-
-            if(ImGui::Button(generateLabel("Ok", "Light").c_str(), ImVec2(120, 0)))
-            {
-                a3EditorLightData* data = new a3EditorLightData();
-                data->type = (a3LightType) item;
-                data->name = "Light" + ofToString(lightList.size());
-                
-                lightList.push_back(data);
-
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::SameLine();
-            if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-            ImGui::EndPopup();
-        }
-
-        ImGui::End();
+        if(continued) it++;
     }
+
+    if(ImGui::Button(generateLabel("+", "Light").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+        ImGui::OpenPopup("Add Light");
+    if(ImGui::BeginPopupModal("Add Light", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static int item = 0;
+        ImGui::Combo(generateLabel("Type", "Light").c_str(), &item, "Point Light\0Area Light\0Infinite Area Light\0Spot Light\0");
+
+        if(ImGui::Button(generateLabel("Ok", "Light").c_str(), ImVec2(120, 0)))
+        {
+            a3EditorLightData* data = new a3EditorLightData();
+            data->type = (a3LightType) item;
+            data->name = "Light" + ofToString(lightList.size());
+
+            lightList.push_back(data);
+
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+        if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
+    }
+
+    //    ImGui::End();
+    //}
 }
 
 //--------------------------------------------------------------
@@ -850,178 +1030,173 @@ void ofApp::lightWindow()
 //--------------------------------------------------------------
 void ofApp::cameraWindow()
 {
-    if(openCameraWindow)
+    //if(openCameraWindow)
+    //{
+    //    ImGui::Begin("Cameras");
+
+    if(ImGui::TreeNode("Free Camera"))
     {
-        ImGui::Begin("Cameras");
-
-        if(ImGui::TreeNode("Free Camera"))
+        if(ImGui::Checkbox("Lock Mouse Input", &lockMouseInput))
         {
-            if(ImGui::Checkbox("Lock Mouse Input", &lockMouseInput))
-            {
-                if(lockMouseInput)
-                    freeCam.disableMouseInput();
-                else
-                    freeCam.enableMouseInput();
-            }
-
-            ImGui::TreePop();
+            if(lockMouseInput)
+                freeCam.disableMouseInput();
+            else
+                freeCam.enableMouseInput();
         }
 
-        for(vector<a3EditorCameraData*>::iterator it = cameraList.begin(); it != cameraList.end();)
+        if(ImGui::Button("Reset", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+            freeCam.reset();
+
+        ImGui::TreePop();
+    }
+
+    for(vector<a3EditorCameraData*>::iterator it = cameraList.begin(); it != cameraList.end();)
+    {
+        a3EditorCameraData* c = *it;
+        bool continued = true;
+
+        if(ImGui::TreeNode(c->name.c_str()))
         {
-            a3EditorCameraData* c = *it;
-            bool continued = true;
-
-            if(ImGui::TreeNode(c->name.c_str()))
+            // active camera to preview
+            if(ImGui::Checkbox(generateLabel("Active", c->name).c_str(), &c->active))
             {
-                //if(ImGui::Checkbox(generateLabel("Lock Mouse Input", it->name).c_str(), &it->lockMouseInput))
-                //{
-                //    if(it->lockMouseInput)
-                //        it->camera->disableMouseInput();
-                //    else
-                //        it->camera->enableMouseInput();
-                //}
+                // 被激活摄像机索引
+                activeCameraIndex = it - cameraList.begin();
+            }
 
-                // active camera to preview
-                if(ImGui::Checkbox(generateLabel("Active", c->name).c_str(), &c->active))
-                {
-                    // 被激活摄像机索引
-                    activeCameraIndex = it - cameraList.begin();
-                }
+            if(ImGui::DragFloat("Width", &c->dimension[0], 1.0f, 1.0f, 1920.0f))
+            {
+                c->camera->setAspectRatio(c->dimension[0] / c->dimension[1]);
+            }
 
-                if(ImGui::DragFloat("Width", &c->dimension[0], 1.0f, 1.0f, 1920.0f))
-                {
-                    c->camera->setAspectRatio(c->dimension[0] / c->dimension[1]);
-                }
+            if(ImGui::DragFloat("Height", &c->dimension[1], 1.0f, 1.0f, 1080.0f))
+            {
+                c->camera->setAspectRatio(c->dimension[0] / c->dimension[1]);
+            }
 
-                if(ImGui::DragFloat("Height", &c->dimension[1], 1.0f, 1.0f, 1080.0f))
-                {
-                    c->camera->setAspectRatio(c->dimension[0] / c->dimension[1]);
-                }
+            // camera orcation
+            //c->lookAt = c->camera->getLookAtDir();
+            if(ImGui::DragFloat3(generateLabel("Look At", c->name).c_str(), &c->lookat[0]))
+            {
+                c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3((c->up)));
+            }
 
-                // camera orcation
-                //c->lookAt = c->camera->getLookAtDir();
-                if(ImGui::DragFloat3(generateLabel("Look At", c->name).c_str(), &c->lookat[0]))
-                {
-                    c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3((c->up)));
-                }
+            //c->up = c->camera->getUpDir();
+            if(ImGui::DragFloat3(generateLabel("Up", c->name).c_str(), &c->up[0]))
+            {
+                c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3(c->up));
+            }
 
-                //c->up = c->camera->getUpDir();
-                if(ImGui::DragFloat3(generateLabel("Up", c->name).c_str(), &c->up[0]))
-                {
-                    c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3(c->up));
-                }
+            a3Float3Set(c->origin, c->camera->getPosition());
+            if(ImGui::DragFloat3(generateLabel("Origin", c->name).c_str(), &c->origin[0]))
+            {
+                c->camera->setPosition(a3Float3ToVec3(c->origin));
+            }
 
-                a3Float3Set(c->origin, c->camera->getPosition());
-                if(ImGui::DragFloat3(generateLabel("Origin", c->name).c_str(), &c->origin[0]))
-                {
-                    c->camera->setPosition(a3Float3ToVec3(c->origin));
-                }
+            // fov
+            c->fov = c->camera->getFov();
+            if(ImGui::DragFloat(generateLabel("FOV", c->name).c_str(), &c->fov, 1.0f, 1.0f, 180.0f))
+            {
+                c->camera->setFov(c->fov);
+            }
 
-                // fov
-                c->fov = c->camera->getFov();
-                if(ImGui::DragFloat(generateLabel("FOV", c->name).c_str(), &c->fov, 1.0f, 1.0f, 180.0f))
-                {
-                    c->camera->setFov(c->fov);
-                }
+            // 视锥体距离
+            ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance);
 
-                // 视锥体距离
-                ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance);
+            IMGUI_BUTTON_DELETE_BEGIN("Camera" + c->name)
+                a3EditorCameraData* temp = *it;
 
-                IMGUI_BUTTON_DELETE_BEGIN("Camera" + c->name)
-                    a3EditorCameraData* temp = *it;
+            it = cameraList.erase(it);
+            if(cameraList.size() <= 0)
+                activeCameraIndex = -1;
+            continued = false;
 
-                    it = cameraList.erase(it);
-                    if(cameraList.size() <= 0)
-                        activeCameraIndex = -1;
-                    continued = false;
-
-                    A3_SAFE_DELETE(temp);
-                IMGUI_BUTTON_DELETE_END()
+            A3_SAFE_DELETE(temp);
+            IMGUI_BUTTON_DELETE_END()
 
                 ImGui::TreePop();
-            }
-
-            if(continued)
-                it++;
         }
 
-        ImGui::Separator();
+        if(continued)
+            it++;
+    }
 
-        if(ImGui::Button("Change Camera To Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+    ImGui::Separator();
+
+    //if(ImGui::Button("Change Camera To Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+    //{
+    //    if(cameraList.size() <= 0)
+    //    {
+    //        a3Log::warning("There is no user defined Camera\n");
+    //    }
+    //    else
+    //    {
+    //        if(activeCameraIndex == -1)
+    //            a3Log::warning("No user defined Camera actived\n");
+    //        else
+    //        {
+    //            // 另一相机后台停止事件更新
+    //            freeCamPreview = !freeCamPreview;
+    //        }
+    //    }
+    //}
+
+    if(ImGui::Button(generateLabel("+", "Camera").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+        ImGui::OpenPopup("Add Camera");
+    if(ImGui::BeginPopupModal("Add Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static char buffer[32];
+        string temp = "Camera";
+
+        temp += ofToString(cameraList.size());
+        strcpy(buffer, temp.c_str());
+
+        ImGui::InputText(generateLabel("Name", "Init Camera").c_str(), buffer, A3_ARRAYSIZE(buffer));
+
+        if(ImGui::Button(generateLabel("OK", "Camera").c_str(), ImVec2(120, 0)))
         {
-            if(cameraList.size() <= 0)
+            bool find = false;
+            for(auto c : cameraList)
             {
-                a3Log::warning("There is no user defined Camera\n");
+                if(!strcmp(buffer, c->name.c_str()))
+                {
+                    find = true;
+                    break;
+                }
+            }
+
+            if(!find)
+            {
+                ofCamera* camera = new ofCamera();
+                //ofEasyCam* camera = new ofEasyCam();
+                a3EditorCameraData* data = new a3EditorCameraData(camera, buffer);
+                cameraList.push_back(data);
             }
             else
             {
-                if(activeCameraIndex == -1)
-                    a3Log::warning("No user defined Camera actived\n");
-                else
-                {
-                    // 另一相机后台停止事件更新
-                    freeCamPreview = !freeCamPreview;
-                }
+                a3Log::warning("Camera named:%s already exsited\n", buffer);
             }
+
+            ImGui::CloseCurrentPopup();
         }
-
-        if(ImGui::Button(generateLabel("+", "Camera").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-            ImGui::OpenPopup("Add Camera");
-        if(ImGui::BeginPopupModal("Add Camera", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            static char buffer[32];
-            string temp = "Camera";
-            
-            temp += ofToString(cameraList.size());
-            strcpy(buffer, temp.c_str());
-            
-            ImGui::InputText(generateLabel("Name", "Init Camera").c_str(), buffer, A3_ARRAYSIZE(buffer));
-
-            if(ImGui::Button(generateLabel("OK", "Camera").c_str(), ImVec2(120, 0)))
-            {
-                bool find = false;
-                for(auto c : cameraList)
-                {
-                    if(!strcmp(buffer, c->name.c_str()))
-                    {
-                        find = true;
-                        break;
-                    }
-                }
-
-                if(!find)
-                {
-                    ofCamera* camera = new ofCamera();
-                    //ofEasyCam* camera = new ofEasyCam();
-                    a3EditorCameraData* data = new a3EditorCameraData(camera, buffer);
-                    cameraList.push_back(data);
-                }
-                else
-                {
-                    a3Log::warning("Camera named:%s already exsited\n", buffer);
-                }
-
-                ImGui::CloseCurrentPopup(); 
-            }
-            ImGui::SameLine();
-            if(ImGui::Button(generateLabel("Cancel", "Camera").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-            ImGui::EndPopup();
-        }
-
-        ImGui::End();
+        ImGui::SameLine();
+        if(ImGui::Button(generateLabel("Cancel", "Camera").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+        ImGui::EndPopup();
     }
+
+    //    ImGui::End();
+    //}
 }
 
 //--------------------------------------------------------------
 void ofApp::rendererWindow()
 {
-    if(!openRendererWindow) return;
+    //if(!openRendererWindow) return;
 
-    ImGui::Begin("Renderer");
+    //ImGui::Begin("Renderer");
 
-    ImGui::Combo("Integrator Type", &integratorType, "Path Tracing\0Direct Lighting\0");
-    ImGui::Combo("PrimitiveSet Type", &primitiveSetType, "Exhaustive\0BVH\0");
+    ImGui::Combo(generateLabel("Integrator", "Renderer").c_str(), &integratorType, "Path Tracing\0Direct Lighting\0");
+    ImGui::Combo(generateLabel("PrimitiveSet", "Renderer").c_str(), &primitiveSetType, "Exhaustive\0BVH\0");
 
     ImGui::DragInt2("Grid Level", gridLevel, 1, 1, 500);
     ImGui::DragInt("Spp", &spp, 1, 1, 10000);
@@ -1031,7 +1206,7 @@ void ofApp::rendererWindow()
     if(integratorType == A3_INTEGRATOR_PATH)
     {
         ImGui::DragInt("Max Depth", &maxDepth);
-        ImGui::DragInt("RussianRoulette Depth", &russianRouletteDepth);
+        ImGui::DragInt("RR Depth", &russianRouletteDepth);
     }
 
     IMGUI_STYLE_BEGIN(2);
@@ -1043,15 +1218,15 @@ void ofApp::rendererWindow()
     }
     IMGUI_STYLE_END();
 
-    ImGui::End();
+    //ImGui::End();
 }
 
 //--------------------------------------------------------------
 void ofApp::materialWindow()
 {
-    if(!openMaterialWindow) return;
+    //if(!openMaterialWindow) return;
 
-    ImGui::Begin("Material");
+    //ImGui::Begin("Material");
 
     for(vector<a3EditorMaterialData*>::iterator it = materialList.begin(); it != materialList.end();)
     {
@@ -1069,16 +1244,16 @@ void ofApp::materialWindow()
             // select a texture
             IMGUI_POPUP_SELECT_TEXTURE(m->name, m->textureIndex)
 
-            IMGUI_BUTTON_DELETE_BEGIN("Material" + m->name)
+                IMGUI_BUTTON_DELETE_BEGIN("Material" + m->name)
                 a3EditorMaterialData* temp = m;
 
-                it = materialList.erase(it);
-                continued = false;
+            it = materialList.erase(it);
+            continued = false;
 
-                A3_SAFE_DELETE(temp);
+            A3_SAFE_DELETE(temp);
             IMGUI_BUTTON_DELETE_END()
 
-            ImGui::TreePop();
+                ImGui::TreePop();
         }
 
         if(continued)
@@ -1108,15 +1283,15 @@ void ofApp::materialWindow()
         ImGui::EndPopup();
     }
 
-    ImGui::End();
+    //ImGui::End();
 }
 
 //--------------------------------------------------------------
 void ofApp::textureWindow()
 {
-    if(!openTextureWindow) return;
+    //if(!openTextureWindow) return;
 
-    ImGui::Begin("Texture");
+    //ImGui::Begin("Texture");
 
     for(vector<a3EditorTextureData*>::iterator it = textureList.begin(); it != textureList.end();)
     {
@@ -1180,13 +1355,13 @@ void ofApp::textureWindow()
             IMGUI_BUTTON_DELETE_BEGIN("Texture" + t->name)
                 a3EditorTextureData* temp = t;
 
-                it = textureList.erase(it);
-                continued = false;
+            it = textureList.erase(it);
+            continued = false;
 
-                A3_SAFE_DELETE(temp);
+            A3_SAFE_DELETE(temp);
             IMGUI_BUTTON_DELETE_END()
 
-            ImGui::TreePop();
+                ImGui::TreePop();
         }
 
         if(continued)
@@ -1216,7 +1391,7 @@ void ofApp::textureWindow()
         ImGui::EndPopup();
     }
 
-    ImGui::End();
+    //ImGui::End();
 }
 
 //--------------------------------------------------------------
@@ -1265,6 +1440,24 @@ a3EditorCameraData* ofApp::getActiveCameraData()
     }
 }
 
+ofFbo * ofApp::getPreviewFbo()
+{
+    if(freeCamPreview)
+    {
+        if(sceneFbo.isAllocated())
+            return &sceneFbo;
+        else
+            return NULL;
+    }
+    else
+    {
+        if(previewFbo.isAllocated())
+            return &previewFbo;
+        else
+            return NULL;
+    }
+}
+
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key)
 {
@@ -1275,9 +1468,9 @@ void ofApp::keyPressed(int key)
 void ofApp::keyReleased(int key)
 {
     if(key == OF_KEY_F4)
-        renderProvess(true);
+        startRenderingProvess(true);
     else if(key == OF_KEY_F5)
-        renderProvess(false);
+        startRenderingProvess(false);
 }
 
 //--------------------------------------------------------------
