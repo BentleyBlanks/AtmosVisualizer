@@ -92,6 +92,10 @@ public:
     /// \returns the current translation key code.
     char getTranslationKey();
 
+    void setMouseTriggerRegion(ofRectangle mouseTriggerRegion);
+
+    ofRectangle getMouseTriggerRegion();
+
     /// \}
     /// \name Mouse Input
     /// \{
@@ -119,8 +123,6 @@ public:
     bool getMouseMiddleButtonEnabled();
 
     /// \}
-
-
 
 private:
     void setDistance(float distance, bool save);
@@ -192,6 +194,7 @@ private:
     ofQuaternion prevOrientation;
 
     ofRectangle viewport;
+    ofRectangle mouseTriggerRect;
 
     ofCoreEvents * events;
 };

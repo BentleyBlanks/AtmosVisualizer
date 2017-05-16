@@ -20,6 +20,8 @@ a3EasyCam::a3EasyCam()
     sensitivityXY = .5f;
     sensitivityZ = .7f;
 
+    mouseTriggerRect.set(0, 0, 100, 100);
+
     bDistanceSet = false;
     bMouseInputEnabled = true;
     bDoRotate = false;
@@ -185,6 +187,16 @@ char a3EasyCam::getTranslationKey()
     return doTranslationKey;
 }
 
+void a3EasyCam::setMouseTriggerRegion(ofRectangle mouseTriggerRegion)
+{
+    mouseTriggerRect = mouseTriggerRegion;
+}
+
+ofRectangle a3EasyCam::getMouseTriggerRegion()
+{
+    return mouseTriggerRect;
+}
+
 //----------------------------------------
 void a3EasyCam::enableMouseInput()
 {
@@ -319,7 +331,8 @@ void a3EasyCam::updateRotation()
 void a3EasyCam::mousePressed(ofMouseEventArgs & mouse)
 {
     ofRectangle viewport = getViewport(this->viewport);
-    if(viewport.inside(mouse.x, mouse.y))
+    //if(viewport.inside(mouse.x, mouse.y))
+    if(mouseTriggerRect.inside(mouse.x, mouse.y))
     {
         lastMouse = mouse;
         prevMouse = mouse;

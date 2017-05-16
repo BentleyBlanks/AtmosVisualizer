@@ -245,6 +245,7 @@ void ofApp::draw()
     //mousePos += ofToString(ofGetMouseY());
     //mousePos += "]";
     //ofDrawBitmapString(mousePos.c_str(), ofGetMouseX(), ofGetMouseY());
+    //ofDrawRectangle(freeCam.getMouseTriggerRegion());
 }
 
 //--------------------------------------------------------------
@@ -352,6 +353,8 @@ void ofApp::guiSetup()
         freeCamPreview = true;
 
         ImVec2 contentRegion = ImGui::GetContentRegionAvail();
+        ImVec2 winPos = ImGui::GetWindowPos();
+        freeCam.setMouseTriggerRegion(ofRectangle(winPos.x, winPos.y, contentRegion.x, contentRegion.y));
         // reallocate
         reallocateFbo(&sceneFbo, contentRegion.x, contentRegion.y, 4);
 
@@ -1101,7 +1104,9 @@ void ofApp::cameraWindow()
             }
 
             // 视锥体距离
-            ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance);
+            if(ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance))
+            {
+            }
 
             IMGUI_BUTTON_DELETE_BEGIN("Camera" + c->name)
                 a3EditorCameraData* temp = *it;
