@@ -20,7 +20,7 @@ a3EasyCam::a3EasyCam()
     sensitivityXY = .5f;
     sensitivityZ = .7f;
 
-    mouseTriggerRect.set(0, 0, 100, 100);
+    mouseTriggerRect.set(0, 0, 500, 500);
 
     bDistanceSet = false;
     bMouseInputEnabled = true;
@@ -187,11 +187,13 @@ char a3EasyCam::getTranslationKey()
     return doTranslationKey;
 }
 
+//----------------------------------------
 void a3EasyCam::setMouseTriggerRegion(ofRectangle mouseTriggerRegion)
 {
     mouseTriggerRect = mouseTriggerRegion;
 }
 
+//----------------------------------------
 ofRectangle a3EasyCam::getMouseTriggerRegion()
 {
     return mouseTriggerRect;

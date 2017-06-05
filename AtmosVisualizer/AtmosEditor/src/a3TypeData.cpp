@@ -10,7 +10,7 @@ a3EditorCameraData::a3EditorCameraData(ofCamera * cam, string name)
     distance = 100;
 
     a3Float3Set(origin, 0, 0, 0);
-    a3Float3Set(up, 0, -1, 0);
+    a3Float3Set(up, 0, 1, 0);
     a3Float3Set(lookat, 0, 0, 1);
 
     dimension.set(768, 768);
@@ -93,6 +93,7 @@ a3EditorModelData::~a3EditorModelData()
 void a3EditorModelData::draw()
 {
     ofPushStyle();
+    ofSetColor(255);
     model->drawWireframe();
     ofPopStyle();
 }
@@ -120,7 +121,8 @@ a3EditorShapeData::~a3EditorShapeData()
 
 void a3EditorShapeData::draw()
 {
-    //ofPushStyle();
+    ofPushStyle();
+    ofSetColor(255);
     switch(type)
     {
     case A3_SHAPE_SPHERE:
@@ -140,7 +142,7 @@ void a3EditorShapeData::draw()
         a3Log::warning("Shape Type not allowed\n");
         break;
     }
-    //ofPopStyle();
+    ofPopStyle();
 }
 
 a3EditorLightData::a3EditorLightData() : textureIndex(-1)
@@ -194,6 +196,7 @@ void a3EditorLightData::draw()
     case A3_LIGHT_POINT:
     case A3_LIGHT_AREA:
     {
+        ofSetColor(ofColor::white);
         drawNode();
         break;
     }
@@ -201,13 +204,14 @@ void a3EditorLightData::draw()
         break;
     case A3_LIGHT_SPOT:
     {
+        ofSetColor(ofColor::white);
         drawNode();
 
-        ofPushStyle();
+        //ofPushStyle();
         ofSetColor(ofColor::green);
         ofDrawArrow(a3Float3ToVec3(position), 
                     a3Float3ToVec3(position) + coneHeight * a3Float3ToVec3(direction).getNormalized(), 5);
-        ofPopStyle();
+        //ofPopStyle();
         //cone->drawWireframe();
         break;
     }
@@ -218,6 +222,7 @@ void a3EditorLightData::draw()
 
 void a3EditorLightData::drawNode()
 {
+    ofSetColor(ofColor::white);
     node->transformGL();
     node->draw();
     node->restoreTransformGL();

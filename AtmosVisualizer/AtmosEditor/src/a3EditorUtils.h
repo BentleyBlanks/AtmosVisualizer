@@ -8,7 +8,7 @@ void a3DrawAxis(float axisLength)
     // axis
     ofPushStyle();
 
-    ofVec3f x(axisLength, 0, 0), y(0, -axisLength, 0), z(0, 0, axisLength);
+    ofVec3f x(axisLength, 0, 0), y(0, axisLength, 0), z(0, 0, axisLength);
 
     ofSetColor(ofColor::red);
     ofLine(ofPoint(), x);

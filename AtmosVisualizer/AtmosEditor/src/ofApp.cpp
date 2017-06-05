@@ -96,21 +96,6 @@ string generateLabel(string name, string anonymous)
     return label;
 }
 
-string getPreviewModeName(a3PreviewType type)
-{
-    switch(type)
-    {
-    case A3_PREVIEW_REALTIME:
-        return "RealTime Preview";
-    case A3_PREVIEW_LOCAL:
-        return "Local Preview";
-    case A3_PREVIEW_IPC:
-        return "IPC Preview";
-    default:
-        return "Unknown Type";
-    }
-}
-
 void reallocateFbo(ofFbo* fbo, int width, int height, int numSamples = 0)
 {
     if(!fbo) return;
@@ -132,31 +117,22 @@ void reallocateFbo(ofFbo* fbo, int width, int height, int numSamples = 0)
 void ofApp::setup()
 {
     ofEnableDepthTest();
-    ofSetFrameRate(60); \
-        ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
+    ofSetFrameRate(60);
+    ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
 
     freeCamPreview = true;
-    freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, -1, 0));
+    freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
+    // 左手系
+    freeCam.setVFlip(true);
 
     activeCameraIndex = -1;
 
     // preview 
     ground = new Graph3D(650, 650, 30, 30);
+    previewShader.load("./preview.vert", "./preview.frag");
 
     ipcS2C.init(L"Who's Your Daddy S2C", true, msgMaxNum / 2, S2CMsgSize);
     ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, C2SMsgSize);
-    //fullScreenIPCPreview = false;
-
-    // window
-    //openCameraWindow = true;
-    //openShapeWindow = true;
-    //openLightWindow = true;
-    //openModelWindow = true;
-    //openRendererWindow = true;
-    //openMaterialWindow = true;
-    //openTextureWindow = true;
-    //openViewWindow = true;
-    //openAboutWindow = false;
 
     // about window
     ofDisableArbTex();
@@ -222,30 +198,11 @@ void ofApp::updateMQ()
 
 //--------------------------------------------------------------
 void ofApp::draw()
-{
-    switch(previewType)
-    {
-    case A3_PREVIEW_REALTIME:
-        realtimePreview();
-        break;
-    case A3_PREVIEW_LOCAL:
-        localPreview();
-        break;
-    case A3_PREVIEW_IPC:
-        ipcPreview();
-        break;
-    }
+{    
+    //--!could stop update when isn't previewing
+    realtimePreview();
 
     guiDraw();
-
-    // -----------------------------------mouse pos-----------------------------------
-    //string mousePos = "[x:";
-    //mousePos += ofToString(ofGetMouseX());
-    //mousePos += ", y:";
-    //mousePos += ofToString(ofGetMouseY());
-    //mousePos += "]";
-    //ofDrawBitmapString(mousePos.c_str(), ofGetMouseX(), ofGetMouseY());
-    //ofDrawRectangle(freeCam.getMouseTriggerRegion());
 }
 
 //--------------------------------------------------------------
@@ -255,21 +212,25 @@ void ofApp::realtimePreview()
     if(!fbo) return;
 
     fbo->begin();
-
-    ofBackground(45, 45, 57);
+    ofClear(45, 45, 57);
 
     // -----------------------------------cam begin-----------------------------------
     getActiveCamera()->begin(ofRectangle(0, 0, fbo->getWidth(), fbo->getHeight()));
+    //getActiveCamera()->begin(ofRectangle(0, 0, 500, 500));
+
+    //ofPushStyle();
+    //ofPushMatrix();
+
+    // turn to left-haned coordinate
+    //previewShader.begin();
 
     // 左手坐标系
     float axisLength = 550;
     a3DrawAxis(axisLength);
     //ofDrawAxis(axisLength);
 
-    ofPushStyle();
     ofSetColor(200, 200, 200, 150);
     ground->draw();
-    ofPopStyle();
 
     // models
     for(auto m : modelList)
@@ -285,26 +246,15 @@ void ofApp::realtimePreview()
     for(auto l : lightList)
         l->draw();
 
+    //previewShader.end();
+
+    //ofPopMatrix();
+    //ofPopStyle();
+
     // -----------------------------------cam end-----------------------------------
     getActiveCamera()->end();
 
     fbo->end();
-}
-
-//--------------------------------------------------------------
-void ofApp::localPreview()
-{
-    //ofBackground(85, 65, 65);
-    //ofDrawBitmapString("Local Preview", ofPoint(ofGetWindowWidth() / 2.0f, ofGetWindowHeight() / 2.0f));
-}
-
-//--------------------------------------------------------------
-void ofApp::ipcPreview()
-{
-    //if(!fullScreenIPCPreview)
-    //    ipcFbo.draw(ofGetWidth() / 2 - ipcFbo.getWidth() / 2, ofGetHeight() / 2 - ipcFbo.getHeight() / 2);
-    //else
-    //    ipcFbo.draw(0, 0, ofGetWidth(), ofGetHeight());
 }
 
 void ofApp::guiSetup()
@@ -319,44 +269,23 @@ void ofApp::guiSetup()
     style->GrabRounding = 0.0f;
     style->ScrollbarRounding = 0.0f;
 
-    //style->WindowMinSize = ImVec2(160, 65);
-    //style->FramePadding = ImVec2(4, 2);
-    //style->ItemSpacing = ImVec2(6, 2);
-    //style->ItemInnerSpacing = ImVec2(6, 4);
-    //style->Alpha = 1.0f;
-    //style->IndentSpacing = 6.0f;
-    //style->ItemInnerSpacing = ImVec2(2, 4);
-    //style->ColumnsMinSpacing = 50.0f;
-    //style->GrabMinSize = 14.0f;
-    //style->ScrollbarSize = 12.0f;
-
     // left
-    rendererDock.initialize("Renderer", true, ImVec2(), [this](ImVec2 area)
-    {
-        rendererWindow();
-    });
+    rendererDock.initialize("Renderer", true, ImVec2(), [this](ImVec2 area) { rendererWindow(); });
 
-    cameraDock.initialize("Camera", true, ImVec2(), [this](ImVec2 area)
-    {
-        cameraWindow();
-    });
+    cameraDock.initialize("Camera", true, ImVec2(), [this](ImVec2 area) { cameraWindow(); });
 
-    modelDock.initialize("Model", true, ImVec2(), [this](ImVec2 area)
-    {
-        modelWindow();
-    });
+    modelDock.initialize("Model", true, ImVec2(), [this](ImVec2 area) { modelWindow(); });
 
     // middle
     sceneDock.initialize("Scene", true, ImVec2(), [this](ImVec2 area)
     {
-        previewType = A3_PREVIEW_REALTIME;
         freeCamPreview = true;
 
         ImVec2 contentRegion = ImGui::GetContentRegionAvail();
         ImVec2 winPos = ImGui::GetWindowPos();
         freeCam.setMouseTriggerRegion(ofRectangle(winPos.x, winPos.y, contentRegion.x, contentRegion.y));
         // reallocate
-        reallocateFbo(&sceneFbo, contentRegion.x, contentRegion.y, 4);
+        reallocateFbo(&sceneFbo, contentRegion.x, contentRegion.y, 1);
 
         // realtime rendering preview
         ImGui::Image((ImTextureID) (uintptr_t) sceneFbo.getTexture().getTextureData().textureID, ImVec2(sceneFbo.getWidth(), sceneFbo.getHeight()));
@@ -373,7 +302,7 @@ void ofApp::guiSetup()
         else return;
 
         // reallocate
-        reallocateFbo(&previewFbo, d.x, d.y, 4);
+        reallocateFbo(&previewFbo, d.x, d.y);
 
         // realtime rendering preview
         ImGui::Image((ImTextureID) (uintptr_t) previewFbo.getTexture().getTextureData().textureID, ImVec2(previewFbo.getWidth(), previewFbo.getHeight()));
@@ -382,8 +311,6 @@ void ofApp::guiSetup()
     offlineResultDock.initialize("Result", true, ImVec2(), [this](ImVec2 area)
     {
         // ipc renderer image
-        previewType = A3_PREVIEW_IPC;
-
         ofVec2f d(ipcFbo.getWidth(), ipcFbo.getHeight());
         if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
             d = cameraList[activeCameraIndex]->dimension;
@@ -397,26 +324,14 @@ void ofApp::guiSetup()
     });
 
     // bottom
-    materialDock.initialize("Material", true, ImVec2(), [this](ImVec2 area)
-    {
-        materialWindow();
-    });
+    materialDock.initialize("Material", true, ImVec2(), [this](ImVec2 area) { materialWindow(); });
 
-    textureDock.initialize("Texture", true, ImVec2(), [this](ImVec2 area)
-    {
-        textureWindow();
-    });
+    textureDock.initialize("Texture", true, ImVec2(), [this](ImVec2 area) { textureWindow(); });
 
     // right
-    shapeDock.initialize("Shape", true, ImVec2(), [this](ImVec2 area)
-    {
-        shapeWindow();
-    });
+    shapeDock.initialize("Shape", true, ImVec2(), [this](ImVec2 area) { shapeWindow(); });
 
-    lightDock.initialize("Light", true, ImVec2(), [this](ImVec2 area)
-    {
-        lightWindow();
-    });
+    lightDock.initialize("Light", true, ImVec2(), [this](ImVec2 area) { lightWindow(); });
 
     int width = ofGetWidth(), height = ofGetHeight();
 
@@ -492,41 +407,12 @@ void ofApp::guiDraw()
             ImGui::EndMenu();
         }
 
-        //if(ImGui::BeginMenu("Window"))
-        //{
-        //    if(ImGui::MenuItem(getWindowToggleName("Shape", openShapeWindow).c_str(), NULL)) { openShapeWindow = !openShapeWindow; }
-        //
-        //    if(ImGui::MenuItem(getWindowToggleName("Light", openLightWindow).c_str(), NULL)) { openLightWindow = !openLightWindow; }
-        //
-        //    if(ImGui::MenuItem(getWindowToggleName("Model", openModelWindow).c_str(), NULL)) { openModelWindow = !openModelWindow; }
-        //
-        //    //if(ImGui::MenuItem(getWindowToggleName("View", openViewWindow).c_str(), NULL)) { openViewWindow = !openViewWindow; }
-        //
-        //    if(ImGui::MenuItem(getWindowToggleName("Camera", openCameraWindow).c_str(), NULL)) { openCameraWindow = !openCameraWindow; }
-        //
-        //    if(ImGui::MenuItem(getWindowToggleName("Renderer", openRendererWindow).c_str(), NULL)) { openRendererWindow = !openRendererWindow; }
-        //
-        //    if(ImGui::MenuItem(getWindowToggleName("Material", openMaterialWindow).c_str(), NULL)) { openMaterialWindow = !openMaterialWindow; }
-        //
-        //    if(ImGui::MenuItem(getWindowToggleName("Texture", openTextureWindow).c_str(), NULL)) { openTextureWindow = !openTextureWindow; }
-        //    
-        //    ImGui::EndMenu();
-        //}
-
         // 替代View Window 为腾出空间给材质编辑Window
         if(ImGui::BeginMenu("View"))
         {
-            //ImGui::Text("Preview Mode: %s", getPreviewModeName(previewType).c_str());
-            //ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
-
             ImGui::Separator();
             if(ImGui::TreeNode("Preview Camera"))
             {
-                if(freeCamPreview)
-                    ImGui::Text("Mode: Free Camera");
-                else
-                    ImGui::Text("Mode: User Defined Camera");
-
                 ofCamera* activeCamera = getActiveCamera();
                 ofVec3f up = activeCamera->getUpDir();
                 ofVec3f lookAt = activeCamera->getLookAtDir();
@@ -536,16 +422,6 @@ void ofApp::guiDraw()
 
                 ImGui::TreePop();
             }
-
-            //ImGui::Separator();
-            //if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-            //    previewType = A3_PREVIEW_REALTIME;
-            //
-            //if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-            //    previewType = A3_PREVIEW_LOCAL;
-            //
-            //if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-            //    previewType = A3_PREVIEW_IPC;
 
             ImGui::EndMenu();
         }
@@ -570,6 +446,7 @@ void ofApp::guiDraw()
     window_flags |= ImGuiWindowFlags_NoResize;
     window_flags |= ImGuiWindowFlags_NoMove;
 
+    // the window contains all docks
     // --!hard coded, can't get it
     int menuHeight = 22;
     int width = ofGetWidth(), height = ofGetHeight();
@@ -580,18 +457,20 @@ void ofApp::guiDraw()
     dockspace.updateAndDraw(ImGui::GetContentRegionAvail());
     ImGui::End();
 
-    // -----------------------------------windows-----------------------------------
-    //modelWindow();
-    //cameraWindow();
-    //lightWindow();
-    //shapeWindow();
-    //rendererWindow();
-    //materialWindow();
-    //textureWindow();
-    //viewWindow();
-    //aboutWindow();
-
     gui.end();
+}
+
+void ofApp::debugDraw()
+{
+    // -----------------------------------mouse pos-----------------------------------
+    string mousePos = "[x:";
+    mousePos += ofToString(ofGetMouseX());
+    mousePos += ", y:";
+    mousePos += ofToString(ofGetMouseY());
+    mousePos += "]";
+    ofDrawBitmapString(mousePos.c_str(), ofGetMouseX(), ofGetMouseY());
+
+    ofDrawRectangle(freeCam.getMouseTriggerRegion());
 }
 
 //--------------------------------------------------------------
@@ -629,9 +508,6 @@ void ofApp::sendInitMessage()
     }
 
     a3EditorCameraData* data = cameraList[activeCameraIndex];
-
-    //if(ipcFbo.isAllocated())
-    //    ipcFbo.clear();
 
     // init the grid preview fbo
     ofDisableArbTex();
@@ -719,10 +595,6 @@ void ofApp::sendInitMessage()
 //--------------------------------------------------------------
 void ofApp::modelWindow()
 {
-    //if(openModelWindow)
-    //{
-    //    ImGui::Begin("Models");
-
     for(vector<a3EditorModelData*>::iterator it = modelList.begin(); it != modelList.end();)
     {
         bool continued = true;
@@ -785,18 +657,11 @@ void ofApp::modelWindow()
             }
         }
     }
-
-    //    ImGui::End();
-    //}
 }
 
 //--------------------------------------------------------------
 void ofApp::shapeWindow()
 {
-    //if(openShapeWindow)
-    //{
-    //    ImGui::Begin("Shapes");
-
     for(vector<a3EditorShapeData*>::iterator it = shapeList.begin(); it != shapeList.end();)
     {
         a3EditorShapeData* s = *it;
@@ -881,18 +746,11 @@ void ofApp::shapeWindow()
         if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
         ImGui::EndPopup();
     }
-    /*
-            ImGui::End();
-        }*/
 }
 
 //--------------------------------------------------------------
 void ofApp::lightWindow()
 {
-    //if(openLightWindow)
-    //{
-    //    ImGui::Begin("Lights");
-
     for(vector<a3EditorLightData*>::iterator it = lightList.begin(); it != lightList.end();)
     {
         bool continued = true;
@@ -980,63 +838,11 @@ void ofApp::lightWindow()
         if(ImGui::Button(generateLabel("Cancel", "Shape").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
         ImGui::EndPopup();
     }
-
-    //    ImGui::End();
-    //}
 }
-
-//--------------------------------------------------------------
-//void ofApp::viewWindow()
-//{
-//    if(openViewWindow)
-//    {
-//        ImGui::Begin("Views");
-//
-//        ImGui::TextWrapped("Preview Mode: %s", getPreviewModeName(previewType).c_str());
-//        ImGui::TextWrapped("FPS:%.2f", ofGetFrameRate());
-//        ImGui::Checkbox("Full Screen IPC Preview", &fullScreenIPCPreview);
-//
-//        ImGui::Separator();
-//        if(ImGui::TreeNode("Preview Camera"))
-//        {
-//            if(freeCamPreview)
-//                ImGui::TextWrapped("Mode: Free Camera");
-//            else
-//                ImGui::TextWrapped("Mode: User Defined Camera");
-//
-//            ofCamera* activeCamera = getActiveCamera();
-//            ofVec3f up = activeCamera->getUpDir();
-//            ofVec3f lookAt = activeCamera->getLookAtDir();
-//            ImGui::TextWrapped("Look At: (%.2f, %.2f, %.2f)", lookAt.x, lookAt.y, lookAt.z);
-//            ImGui::TextWrapped("Up: (%.2f, %2f, %.2f)", up.x, up.y, up.z);
-//            ImGui::TextWrapped("Aspect Ratio: %.2f", activeCamera->getAspectRatio());
-//
-//            ImGui::TreePop();
-//        }
-//
-//        ImGui::Separator();
-//        if(ImGui::Button("RealTime Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-//            previewType = A3_PREVIEW_REALTIME;
-//        //ImGui::SameLine();
-//
-//        if(ImGui::Button("Local Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-//            previewType = A3_PREVIEW_LOCAL;
-//        //ImGui::SameLine();
-//
-//        if(ImGui::Button("IPC Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-//            previewType = A3_PREVIEW_IPC;
-//        
-//        ImGui::End();
-//    }
-//}
 
 //--------------------------------------------------------------
 void ofApp::cameraWindow()
 {
-    //if(openCameraWindow)
-    //{
-    //    ImGui::Begin("Cameras");
-
     if(ImGui::TreeNode("Free Camera"))
     {
         if(ImGui::Checkbox("Lock Mouse Input", &lockMouseInput))
@@ -1104,9 +910,7 @@ void ofApp::cameraWindow()
             }
 
             // 视锥体距离
-            if(ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance))
-            {
-            }
+            ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance);
 
             IMGUI_BUTTON_DELETE_BEGIN("Camera" + c->name)
                 a3EditorCameraData* temp = *it;
@@ -1127,24 +931,6 @@ void ofApp::cameraWindow()
     }
 
     ImGui::Separator();
-
-    //if(ImGui::Button("Change Camera To Preview", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
-    //{
-    //    if(cameraList.size() <= 0)
-    //    {
-    //        a3Log::warning("There is no user defined Camera\n");
-    //    }
-    //    else
-    //    {
-    //        if(activeCameraIndex == -1)
-    //            a3Log::warning("No user defined Camera actived\n");
-    //        else
-    //        {
-    //            // 另一相机后台停止事件更新
-    //            freeCamPreview = !freeCamPreview;
-    //        }
-    //    }
-    //}
 
     if(ImGui::Button(generateLabel("+", "Camera").c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
         ImGui::OpenPopup("Add Camera");
@@ -1173,6 +959,8 @@ void ofApp::cameraWindow()
             if(!find)
             {
                 ofCamera* camera = new ofCamera();
+                // 左手系
+                camera->setVFlip(true);
                 //ofEasyCam* camera = new ofEasyCam();
                 a3EditorCameraData* data = new a3EditorCameraData(camera, buffer);
                 cameraList.push_back(data);
@@ -1188,18 +976,11 @@ void ofApp::cameraWindow()
         if(ImGui::Button(generateLabel("Cancel", "Camera").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
         ImGui::EndPopup();
     }
-
-    //    ImGui::End();
-    //}
 }
 
 //--------------------------------------------------------------
 void ofApp::rendererWindow()
 {
-    //if(!openRendererWindow) return;
-
-    //ImGui::Begin("Renderer");
-
     ImGui::Combo(generateLabel("Integrator", "Renderer").c_str(), &integratorType, "Path Tracing\0Direct Lighting\0");
     ImGui::Combo(generateLabel("PrimitiveSet", "Renderer").c_str(), &primitiveSetType, "Exhaustive\0BVH\0");
 
@@ -1222,17 +1003,11 @@ void ofApp::rendererWindow()
             saveImagePath = result.filePath;
     }
     IMGUI_STYLE_END();
-
-    //ImGui::End();
 }
 
 //--------------------------------------------------------------
 void ofApp::materialWindow()
 {
-    //if(!openMaterialWindow) return;
-
-    //ImGui::Begin("Material");
-
     for(vector<a3EditorMaterialData*>::iterator it = materialList.begin(); it != materialList.end();)
     {
         a3EditorMaterialData* m = *it;
@@ -1287,17 +1062,11 @@ void ofApp::materialWindow()
         if(ImGui::Button(generateLabel("Cancel", "Texture").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
         ImGui::EndPopup();
     }
-
-    //ImGui::End();
 }
 
 //--------------------------------------------------------------
 void ofApp::textureWindow()
 {
-    //if(!openTextureWindow) return;
-
-    //ImGui::Begin("Texture");
-
     for(vector<a3EditorTextureData*>::iterator it = textureList.begin(); it != textureList.end();)
     {
         a3EditorTextureData* t = *it;
@@ -1395,28 +1164,7 @@ void ofApp::textureWindow()
         if(ImGui::Button(generateLabel("Cancel", "Texture").c_str(), ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
         ImGui::EndPopup();
     }
-
-    //ImGui::End();
 }
-
-//--------------------------------------------------------------
-//void ofApp::aboutWindow()
-//{
-//    if(!openAboutWindow) return;
-//
-//    ImGuiWindowFlags window_flags = 0;
-//    ImGui::SetNextWindowSize(ofVec2f(400, 300), ImGuiSetCond_FirstUseEver);
-//    if(ImGui::Begin("About", &openAboutWindow))
-//    {
-//        ImGui::ImageButton((ImTextureID) (uintptr_t) logoButtonID, ImVec2(200, 200));
-//        ImGui::SameLine();
-//        ImGui::Text("AtmosEditor is developed by GBB in 2017.");
-//        ImGui::SameLine();
-//        ImGui::Text("And I guess no one would notice this passage.");
-//    }
-//
-//    ImGui::End();
-//}
 
 //--------------------------------------------------------------
 ofCamera* ofApp::getActiveCamera()

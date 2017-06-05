@@ -12,13 +12,6 @@
 #include "messageQueue/a3MessageQueueIPC.h"
 #include "a3EasyCam.h"
 
-enum a3PreviewType
-{
-    A3_PREVIEW_REALTIME,
-    A3_PREVIEW_LOCAL,
-    A3_PREVIEW_IPC,
-};
-
 class ofApp : public ofBaseApp
 {
 public:
@@ -40,6 +33,7 @@ public:
 
     void guiSetup();
     void guiDraw();
+    void debugDraw();
     void updateMQ();
     void startRenderingProvess(bool isDebug);
     void sendInitMessage();
@@ -52,13 +46,9 @@ public:
     void rendererWindow();
     void materialWindow();
     void textureWindow();
-    //void viewWindow();
-    //void aboutWindow();
 
     // preview
     void realtimePreview();
-    void localPreview();
-    void ipcPreview();
 
     // camera
     ofCamera* getActiveCamera();
@@ -73,46 +63,41 @@ public:
                     materialDock, textureDock, 
                     shapeDock, lightDock;
 
-    // bool openViewWindow;
-    //bool openCameraWindow, openShapeWindow, openLightWindow, openModelWindow, 
-    //     openAboutWindow, openRendererWindow, openMaterialWindow, openTextureWindow;
-
     ofImage logo;
     GLuint logoButtonID;
 
     // preview
     Graph3D* ground;
-    //ofEasyCam freeCam;
     a3EasyCam freeCam;
     a3MessageQueueIPC ipcC2S, ipcS2C;
     ofFbo sceneFbo, previewFbo, ipcFbo;
     ImVec2 previewContentRegion;
+    // right-handed coordinate
+    ofShader previewShader;
 
-    // light
+    // lights
     vector<a3EditorLightData*> lightList;
 
     // models
     vector<a3EditorModelData*> modelList;
 
-    // material
+    // materials
     vector<a3EditorMaterialData*> materialList;
     
-    // texture
+    // textures
     vector<a3EditorTextureData*> textureList;
 
     // cameras
     vector<a3EditorCameraData*> cameraList;
-    bool lockMouseInput;
     int activeCameraIndex;
+    bool lockMouseInput;
+
+    // shapes
+    vector<a3EditorShapeData*> shapeList;
 
     // view mode
     // true freecam; false userdefined camera
     bool freeCamPreview;
-    a3PreviewType previewType;
-    //bool fullScreenIPCPreview;
-
-    // shape
-    vector<a3EditorShapeData*> shapeList;
 
     // renderer
     string saveImagePath;
