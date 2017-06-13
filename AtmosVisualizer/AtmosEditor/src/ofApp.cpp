@@ -213,6 +213,7 @@ void ofApp::realtimePreview()
 
     fbo->begin();
     ofClear(45, 45, 57);
+    ofEnableAntiAliasing();
 
     // -----------------------------------cam begin-----------------------------------
     getActiveCamera()->begin(ofRectangle(0, 0, fbo->getWidth(), fbo->getHeight()));
@@ -229,8 +230,10 @@ void ofApp::realtimePreview()
     a3DrawAxis(axisLength);
     //ofDrawAxis(axisLength);
 
-    ofSetColor(200, 200, 200, 150);
+    ofPushStyle();
+    ofSetColor(200, 200, 200, 200);
     ground->draw();
+    ofPopStyle();
 
     // models
     for(auto m : modelList)
@@ -285,7 +288,7 @@ void ofApp::guiSetup()
         ImVec2 winPos = ImGui::GetWindowPos();
         freeCam.setMouseTriggerRegion(ofRectangle(winPos.x, winPos.y, contentRegion.x, contentRegion.y));
         // reallocate
-        reallocateFbo(&sceneFbo, contentRegion.x, contentRegion.y, 1);
+        reallocateFbo(&sceneFbo, contentRegion.x, contentRegion.y);
 
         // realtime rendering preview
         ImGui::Image((ImTextureID) (uintptr_t) sceneFbo.getTexture().getTextureData().textureID, ImVec2(sceneFbo.getWidth(), sceneFbo.getHeight()));
