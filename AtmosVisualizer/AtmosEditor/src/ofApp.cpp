@@ -73,6 +73,7 @@ static wstring atmosDebugEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\
 
 static wstring atmosReleaseEXEPath = L"C:\\Bingo\\Program\\Renderer\\Atmos\\build\\Atmos.vs2015\\Atmos\\x64\\Release\\AtmosTest.x64.exe";
 
+//--------------------------------------------------------------
 string getWindowToggleName(string windowName, bool windowOpened)
 {
     string name;
@@ -88,6 +89,7 @@ string getWindowToggleName(string windowName, bool windowOpened)
     return name;
 }
 
+//--------------------------------------------------------------
 string generateLabel(string name, string anonymous)
 {
     string label = name;
@@ -96,6 +98,7 @@ string generateLabel(string name, string anonymous)
     return label;
 }
 
+//--------------------------------------------------------------
 void reallocateFbo(ofFbo* fbo, int width, int height, int numSamples = 0)
 {
     if(!fbo) return;
@@ -114,6 +117,13 @@ void reallocateFbo(ofFbo* fbo, int width, int height, int numSamples = 0)
 }
 
 //--------------------------------------------------------------
+inline ofVec3f float3ToVec3(const float* f3)
+{
+    // 不做安全检查
+    return ofVec3f(f3[0], f3[1], f3[2]);
+}
+
+//--------------------------------------------------------------
 void ofApp::setup()
 {
     ofEnableDepthTest();
@@ -121,9 +131,9 @@ void ofApp::setup()
     ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
 
     freeCamPreview = true;
-    freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
     // 左手系
     freeCam.setVFlip(true);
+    freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
 
     activeCameraIndex = -1;
 
@@ -149,6 +159,7 @@ void ofApp::setup()
     enableToneMapping = false;
     gridLevel[0] = 16;
     gridLevel[1] = 16;
+    visualizeRays = true;
 
     guiSetup();
 }
@@ -187,10 +198,20 @@ void ofApp::updateMQ()
                 ipcFbo.begin();
                 img.draw(msg->gridX, msg->gridY);
                 ipcFbo.end();
+
+                a3Ray* temp = new a3Ray(float3ToVec3(msg->origin), float3ToVec3(msg->origin) + float3ToVec3(msg->direction) * 200);
+                rayLists.push_back(temp);
+
                 break;
             }
             case A3_C2S_MSG_LIGHTPATH:
+            {
+                //const a3C2SLightPathMessage* msg = (const a3C2SLightPathMessage*) pMsg;
+
+                //a3Ray* temp = new a3Ray(float3ToVec3(msg->origin), float3ToVec3(msg->direction) * 200);
+                //rayLists.push_back(temp);
                 break;
+            }
             }
         }
     }
@@ -249,6 +270,11 @@ void ofApp::realtimePreview()
     for(auto l : lightList)
         l->draw();
 
+    if(visualizeRays)
+    {
+        for(auto r : rayLists)
+            r->draw();
+    }
     //previewShader.end();
 
     //ofPopMatrix();
@@ -260,6 +286,7 @@ void ofApp::realtimePreview()
     fbo->end();
 }
 
+//--------------------------------------------------------------
 void ofApp::guiSetup()
 {
     gui.setup();
@@ -463,6 +490,7 @@ void ofApp::guiDraw()
     gui.end();
 }
 
+//--------------------------------------------------------------
 void ofApp::debugDraw()
 {
     // -----------------------------------mouse pos-----------------------------------
@@ -482,6 +510,11 @@ void ofApp::startRenderingProvess(bool isDebug)
     if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
     {
         a3Log::info("Start IPC Debug Rendering\n");
+
+        // 清空上次可视化光线数据
+        for(auto r : rayLists)
+            A3_SAFE_DELETE(r);
+        rayLists.clear();
 
         SHELLEXECUTEINFO shell = {sizeof(shell)};
         shell.fMask = SEE_MASK_FLAG_DDEWAIT;
@@ -964,6 +997,8 @@ void ofApp::cameraWindow()
                 ofCamera* camera = new ofCamera();
                 // 左手系
                 camera->setVFlip(true);
+                camera->lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
+
                 //ofEasyCam* camera = new ofEasyCam();
                 a3EditorCameraData* data = new a3EditorCameraData(camera, buffer);
                 cameraList.push_back(data);
@@ -991,6 +1026,8 @@ void ofApp::rendererWindow()
     ImGui::DragInt("Spp", &spp, 1, 1, 10000);
     ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
     ImGui::Checkbox("Enable Tone Mapping", &enableToneMapping);
+
+    ImGui::Checkbox("Visualise Rays", &visualizeRays);
 
     if(integratorType == A3_INTEGRATOR_PATH)
     {

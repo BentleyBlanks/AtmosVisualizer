@@ -7,6 +7,7 @@
 #include "ofxImGui.h"
 #include "imgui_dock.h"
 
+#include "a3Ray.h"
 #include "a3TypeData.h"
 #include "messageQueue/a3Message.h"
 #include "messageQueue/a3MessageQueueIPC.h"
@@ -74,6 +75,10 @@ public:
     ImVec2 previewContentRegion;
     // right-handed coordinate
     ofShader previewShader;
+    // ray
+    bool visualizeRays;
+    // ray collections
+    vector<a3Ray*> rayLists;
 
     // lights
     vector<a3EditorLightData*> lightList;
