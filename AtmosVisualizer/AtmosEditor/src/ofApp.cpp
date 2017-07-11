@@ -139,7 +139,7 @@ void ofApp::setup()
 
     // preview 
     ground = new Graph3D(650, 650, 30, 30);
-    previewShader.load("./preview.vert", "./preview.frag");
+    //previewShader.load("./preview.vert", "./preview.frag");
 
     ipcS2C.init(L"Who's Your Daddy S2C", true, msgMaxNum / 2, S2CMsgSize);
     ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, C2SMsgSize);
@@ -159,7 +159,8 @@ void ofApp::setup()
     enableToneMapping = false;
     gridLevel[0] = 16;
     gridLevel[1] = 16;
-    visualizeRays = true;
+    primitiveSetType = 1;
+    visualizeRays = false;
 
     guiSetup();
 }
@@ -662,6 +663,8 @@ void ofApp::modelWindow()
         if(result.bSuccess)
         {
             ofxAssimpModelLoader* loader = new ofxAssimpModelLoader();
+            loader->setScaleNormalization(false);
+
             if(loader->loadModel(result.filePath))
             {
                 bool find = false;
