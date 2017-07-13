@@ -283,6 +283,47 @@ bool a3EasyCam::getMouseMiddleButtonEnabled()
     return bEnableMouseMiddleButton;
 }
 
+void a3EasyCam::lookAt(const ofVec3f & lookAtPosition)
+{
+    auto relPosition = (lookAtPosition - getGlobalPosition());
+    auto radius = relPosition.length();
+    if(radius>0)
+    {
+        auto latitude = ofRadToDeg(acos(relPosition.y / radius)) - 90;
+        auto longitude = ofRadToDeg(atan2(relPosition.x, relPosition.z));
+        ofQuaternion q(latitude, ofVec3f(1, 0, 0), longitude, ofVec3f(0, 1, 0), 0, ofVec3f(0, 0, 1));
+        setGlobalOrientation(q);
+    }
+}
+
+void a3EasyCam::lookAt(const ofVec3f & lookAtPosition, ofVec3f upVector)
+{
+    if(parent) upVector = upVector * ofMatrix4x4::getInverseOf(parent->getGlobalTransformMatrix());
+    ofVec3f zaxis = (lookAtPosition - getGlobalPosition()).getNormalized();
+    if(zaxis.length() > 0)
+    {
+        ofVec3f xaxis = upVector.getCrossed(zaxis).getNormalized();
+        ofVec3f yaxis = zaxis.getCrossed(xaxis);
+
+        ofMatrix4x4 m;
+        m._mat[0].set(xaxis.x, xaxis.y, xaxis.z, 0);
+        m._mat[1].set(yaxis.x, yaxis.y, yaxis.z, 0);
+        m._mat[2].set(zaxis.x, zaxis.y, zaxis.z, 0);
+
+        setGlobalOrientation(m.getRotate());
+    }
+}
+
+void a3EasyCam::lookAt(const ofNode & lookAtNode)
+{
+    lookAt(lookAtNode.getGlobalPosition());
+}
+
+void a3EasyCam::lookAt(const ofNode & lookAtNode, const ofVec3f & upVector)
+{
+    lookAt(lookAtNode.getGlobalPosition(), upVector);
+}
+
 //----------------------------------------
 void a3EasyCam::updateTranslation()
 {

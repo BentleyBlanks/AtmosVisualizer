@@ -128,18 +128,20 @@ void ofApp::setup()
 {
     ofEnableDepthTest();
     ofSetFrameRate(60);
-    ShowWindow(ofGetWin32Window(), SW_MAXIMIZE);
+    ShowWindow(ofGetWin32Window(), SW_MAXIMIZE); 
 
     freeCamPreview = true;
     // 左手系
-    freeCam.setVFlip(true);
+    //freeCam.setVFlip(true);
+    freeCam.setPosition(ofVec3f(0, 0, -500));
     freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
 
     activeCameraIndex = -1;
 
     // preview 
     ground = new Graph3D(650, 650, 30, 30);
-    //previewShader.load("./preview.vert", "./preview.frag");
+    previewShader.load("axis");
+    axisLength = 550;
 
     ipcS2C.init(L"Who's Your Daddy S2C", true, msgMaxNum / 2, S2CMsgSize);
     ipcC2S.init(L"Who's Your Daddy C2S", true, msgMaxNum, C2SMsgSize);
@@ -241,16 +243,16 @@ void ofApp::realtimePreview()
     getActiveCamera()->begin(ofRectangle(0, 0, fbo->getWidth(), fbo->getHeight()));
     //getActiveCamera()->begin(ofRectangle(0, 0, 500, 500));
 
-    //ofPushStyle();
-    //ofPushMatrix();
-
     // turn to left-haned coordinate
-    //previewShader.begin();
+    ofPushMatrix();
+    static ofMatrix4x4 m(-1, 0, 0, 0,
+                          0, 1, 0, 0,
+                          0, 0, 1, 0,
+                          0, 0, 0, 1);
+    ofMultMatrix(m);
 
     // 左手坐标系
-    float axisLength = 550;
     a3DrawAxis(axisLength);
-    //ofDrawAxis(axisLength);
 
     ofPushStyle();
     ofSetColor(200, 200, 200, 200);
@@ -276,11 +278,8 @@ void ofApp::realtimePreview()
         for(auto r : rayLists)
             r->draw();
     }
-    //previewShader.end();
 
-    //ofPopMatrix();
-    //ofPopStyle();
-
+    ofPopMatrix();
     // -----------------------------------cam end-----------------------------------
     getActiveCamera()->end();
 
@@ -351,7 +350,7 @@ void ofApp::guiSetup()
         reallocateFbo(&ipcFbo, d.x, d.y);
 
         // realtime rendering preview
-        ImGui::Image((ImTextureID) (uintptr_t) ipcFbo.getTexture().getTextureData().textureID, ImVec2(ipcFbo.getWidth(), ipcFbo.getHeight()));
+        ImGui::Image((ImTextureID) (uintptr_t) ipcFbo.getTexture().getTextureData().textureID, ImVec2(ipcFbo.getWidth() , ipcFbo.getHeight()));
     });
 
     // bottom
@@ -367,18 +366,18 @@ void ofApp::guiSetup()
     int width = ofGetWidth(), height = ofGetHeight();
 
     dockspace.dock(&rendererDock, ImGuiDock::DockSlot::Left, 0.25 * width, true);
-    dockspace.dockWith(&sceneDock, &rendererDock, ImGuiDock::DockSlot::Right, 0.7 * width, true);
+    dockspace.dockWith(&sceneDock, &rendererDock, ImGuiDock::DockSlot::Right, 0.7 * width, false);
     dockspace.dockWith(&previewDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
     dockspace.dockWith(&offlineResultDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
 
     dockspace.dockWith(&cameraDock, &rendererDock, ImGuiDock::DockSlot::Bottom, 0.6 * height, true);
     dockspace.dockWith(&modelDock, &cameraDock, ImGuiDock::DockSlot::Tab, 0, false);
 
-    dockspace.dock(&shapeDock, ImGuiDock::DockSlot::Right, 0.15 * width, true);
-    dockspace.dockWith(&lightDock, &shapeDock, ImGuiDock::DockSlot::Tab, 0, false);
+    dockspace.dock(&shapeDock, ImGuiDock::DockSlot::Right, 0.15 * width, false);
+    dockspace.dockWith(&lightDock, &shapeDock, ImGuiDock::DockSlot::Tab, 0, true);
 
-    dockspace.dockWith(&materialDock, &shapeDock, ImGuiDock::DockSlot::Bottom, 0.5 * height, false);
-    dockspace.dockWith(&textureDock, &materialDock, ImGuiDock::DockSlot::Tab, 0, true);
+    dockspace.dockWith(&materialDock, &shapeDock, ImGuiDock::DockSlot::Bottom, 0.5 * height, true);
+    dockspace.dockWith(&textureDock, &materialDock, ImGuiDock::DockSlot::Tab, 0, false);
 }
 
 //--------------------------------------------------------------
@@ -637,13 +636,17 @@ void ofApp::modelWindow()
         bool continued = true;
         a3EditorModelData* m = *it;
 
-        if(ImGui::TreeNode((*it)->name.c_str()))
+        if(ImGui::TreeNode(m->name.c_str()))
         {
+            // preview faces / wireframe
+            ImGui::Checkbox(generateLabel("Preview", m->name).c_str(), &m->drawFaces);
+            ImGui::DragInt3(generateLabel("Color", m->name).c_str(), &m->previewColor[0], 1, 0, 255);
+
             // select material
             IMGUI_POPUP_SELECT_MATERIAL(m->name, m->materialIndex)
 
-                IMGUI_BUTTON_DELETE_BEGIN("Models" + m->name)
-                a3EditorModelData* temp = *it;
+            IMGUI_BUTTON_DELETE_BEGIN("Models" + m->name)
+            a3EditorModelData* temp = *it;
 
             it = modelList.erase(it);
             continued = false;
@@ -651,7 +654,7 @@ void ofApp::modelWindow()
             A3_SAFE_DELETE(temp);
             IMGUI_BUTTON_DELETE_END()
 
-                ImGui::TreePop();
+            ImGui::TreePop();
         }
 
         if(continued) it++;
@@ -679,6 +682,14 @@ void ofApp::modelWindow()
 
                 if(!find)
                 {
+                    // ofxAssimpModelLoader would rotate the model after imported.
+                    float angle = 180.0;
+                    ofPoint axis = ofPoint(0.0, 0.0, 1.0);
+                    int numRotation = loader->getNumRotations();
+                    loader->setRotation(numRotation, angle, axis.x, axis.y, axis.z);
+                    // enable user-defined color
+                    loader->enableColors();
+
                     a3Log::success("Successfully loded model:%s\n", result.filePath.c_str());
                     a3EditorModelData* data = new a3EditorModelData(loader, result.filePath, result.fileName);
                     modelList.push_back(data);
@@ -939,6 +950,7 @@ void ofApp::cameraWindow()
             if(ImGui::DragFloat3(generateLabel("Origin", c->name).c_str(), &c->origin[0]))
             {
                 c->camera->setPosition(a3Float3ToVec3(c->origin));
+                c->camera->lookAt(a3Float3ToVec3(c->lookat), a3Float3ToVec3(c->up));
             }
 
             // fov
@@ -999,7 +1011,7 @@ void ofApp::cameraWindow()
             {
                 ofCamera* camera = new ofCamera();
                 // 左手系
-                camera->setVFlip(true);
+                //camera->setVFlip(true);
                 camera->lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
 
                 //ofEasyCam* camera = new ofEasyCam();

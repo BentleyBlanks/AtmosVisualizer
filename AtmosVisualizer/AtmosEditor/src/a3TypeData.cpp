@@ -33,15 +33,15 @@ void a3EditorCameraData::draw()
     // ±¾Ìå
     camera->transformGL();
 
-    ofPushMatrix();
+    //ofPushMatrix();
     if(active)
         ofSetColor(20, 210, 20);
     else
         ofSetColor(255);
 
-    ofScale(1, 1, 1);
+    //ofScale(1, 1, 1);
     ofNode().draw();
-    ofPopMatrix();
+    //ofPopMatrix();
 
     camera->restoreTransformGL();
 
@@ -83,6 +83,10 @@ a3EditorModelData::a3EditorModelData(ofxAssimpModelLoader * loader, string model
 {
     if(modelPath.length() <= A3_ADDRESS_PATH_LENGTH)
         strcpy(path, modelPath.c_str());
+
+    previewColor[0] = 255;
+    previewColor[1] = 255;
+    previewColor[2] = 255;
 }
 
 a3EditorModelData::~a3EditorModelData()
@@ -93,8 +97,19 @@ a3EditorModelData::~a3EditorModelData()
 void a3EditorModelData::draw()
 {
     ofPushStyle();
-    ofSetColor(255);
-    model->drawWireframe();
+    ofSetColor(previewColor[0], previewColor[1], previewColor[2]);
+    if(!drawFaces)
+    {
+        ofNoFill();
+        model->drawWireframe();
+        ofFill();
+    }
+    else
+    {
+        ofFill();
+        model->drawFaces();
+        ofNoFill();
+    }
     ofPopStyle();
 }
 
@@ -191,6 +206,7 @@ void a3EditorLightData::updatePosition()
 
 void a3EditorLightData::draw()
 {
+    ofPushStyle();
     switch(type)
     {
     case A3_LIGHT_POINT:
@@ -209,7 +225,7 @@ void a3EditorLightData::draw()
 
         //ofPushStyle();
         ofSetColor(ofColor::green);
-        ofDrawArrow(a3Float3ToVec3(position), 
+        ofDrawArrow(a3Float3ToVec3(position),
                     a3Float3ToVec3(position) + coneHeight * a3Float3ToVec3(direction).getNormalized(), 5);
         //ofPopStyle();
         //cone->drawWireframe();
@@ -218,6 +234,7 @@ void a3EditorLightData::draw()
     default:
         break;
     }
+    ofPopStyle();
 }
 
 void a3EditorLightData::drawNode()

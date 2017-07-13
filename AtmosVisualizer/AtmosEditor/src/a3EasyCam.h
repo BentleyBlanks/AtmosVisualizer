@@ -124,6 +124,19 @@ public:
 
     /// \}
 
+    //--!for left-handed coordinate
+    /// \brief Orient node to look at position (-z axis pointing to position)
+    ///
+    /// This version calculates the up vector by rotating {0,1,0} by the same
+    /// angle that will rotate {0,0,1} to the current position - lookAtPosition
+    void lookAt(const ofVec3f& lookAtPosition);
+
+    void lookAt(const ofVec3f& lookAtPosition, ofVec3f upVector);
+
+    void lookAt(const ofNode& lookAtNode);
+
+    void lookAt(const ofNode& lookAtNode, const ofVec3f& upVector);
+
 private:
     void setDistance(float distance, bool save);
 

@@ -60,6 +60,10 @@ struct a3EditorModelData : public a3ModelData
     ofxAssimpModelLoader* model;
     string name;
     int materialIndex;
+
+    bool drawFaces;
+    // 0~255
+    int previewColor[3];
 };
 
 struct a3EditorCameraData : public a3CameraData
@@ -99,6 +103,7 @@ struct a3EditorTextureData : public a3TextureData
     string name;
 
     // for image texture
-    ofImage image;
+    //ofImage image;
+    ofFloatImage image;
     //GLuint imageID;
 };

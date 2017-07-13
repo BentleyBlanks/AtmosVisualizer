@@ -69,6 +69,7 @@ public:
 
     // preview
     Graph3D* ground;
+    float axisLength;
     a3EasyCam freeCam;
     a3MessageQueueIPC ipcC2S, ipcS2C;
     ofFbo sceneFbo, previewFbo, ipcFbo;

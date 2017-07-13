@@ -21,10 +21,13 @@ void a3DrawAxis(float axisLength)
 
     ofPopStyle();
 
+    ofPushStyle();
     // axis name
+    ofSetColor(ofColor::white);
     ofDrawBitmapString("x", x);
     ofDrawBitmapString("y", y);
     ofDrawBitmapString("z", z);
+    ofPopStyle();
 }
 
 inline wstring a3S2WS(const std::string& str)
