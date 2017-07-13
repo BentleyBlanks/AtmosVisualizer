@@ -66,6 +66,8 @@ public:
 
     ofImage logo;
     GLuint logoButtonID;
+    // version
+    int versionMajor, versionMinor;
 
     // preview
     Graph3D* ground;

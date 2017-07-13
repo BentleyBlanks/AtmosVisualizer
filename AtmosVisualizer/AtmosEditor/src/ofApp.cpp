@@ -126,13 +126,17 @@ inline ofVec3f float3ToVec3(const float* f3)
 //--------------------------------------------------------------
 void ofApp::setup()
 {
+    // editor
     ofEnableDepthTest();
     ofSetFrameRate(60);
     ShowWindow(ofGetWin32Window(), SW_MAXIMIZE); 
+    versionMajor = 0;
+    versionMinor = 11;
 
     freeCamPreview = true;
     // 左手系
     //freeCam.setVFlip(true);
+    freeCam.setupPerspective(false, 60, 0.001, 100000.0f);
     freeCam.setPosition(ofVec3f(0, 0, -500));
     freeCam.lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
 
@@ -246,9 +250,9 @@ void ofApp::realtimePreview()
     // turn to left-haned coordinate
     ofPushMatrix();
     static ofMatrix4x4 m(-1, 0, 0, 0,
-                          0, 1, 0, 0,
-                          0, 0, 1, 0,
-                          0, 0, 0, 1);
+                         0, 1, 0, 0,
+                         0, 0, 1, 0,
+                         0, 0, 0, 1);
     ofMultMatrix(m);
 
     // 左手坐标系
@@ -259,25 +263,30 @@ void ofApp::realtimePreview()
     ground->draw();
     ofPopStyle();
 
+    // ---------------------object begin---------------------
     // models
     for(auto m : modelList)
         m->draw();
 
-    // camera
-    for(auto c : cameraList)
-        c->draw();
+    // cameras
+    // 被激活相中预览中不渲染自身防止引起画面错误
+    if(freeCamPreview)
+        for(auto c : cameraList)
+            c->draw();
 
+    // shapes
     for(auto s : shapeList)
         s->draw();
 
+    // lights
     for(auto l : lightList)
         l->draw();
 
+    // rays
     if(visualizeRays)
-    {
         for(auto r : rayLists)
             r->draw();
-    }
+    // ---------------------object end---------------------
 
     ofPopMatrix();
     // -----------------------------------cam end-----------------------------------
@@ -365,8 +374,8 @@ void ofApp::guiSetup()
 
     int width = ofGetWidth(), height = ofGetHeight();
 
-    dockspace.dock(&rendererDock, ImGuiDock::DockSlot::Left, 0.25 * width, true);
-    dockspace.dockWith(&sceneDock, &rendererDock, ImGuiDock::DockSlot::Right, 0.7 * width, false);
+    dockspace.dock(&rendererDock, ImGuiDock::DockSlot::Left, 0.27 * width, true);
+    dockspace.dockWith(&sceneDock, &rendererDock, ImGuiDock::DockSlot::Right, 0.68 * width, false);
     dockspace.dockWith(&previewDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
     dockspace.dockWith(&offlineResultDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
 
@@ -458,10 +467,19 @@ void ofApp::guiDraw()
 
         if(ImGui::BeginMenu("About"))
         {
-            ImGui::Text("AtmosEditor is developed by GBB in 2017.");
-            if(ImGui::ImageButton((ImTextureID) (uintptr_t) logoButtonID, ImVec2(200, 200)))
-                a3Log::debug("And I guess no one would notice this passage.\n");
+            if(ImGui::BeginMenu("Version"))
+            {
+                ImGui::Text("Atmos Editor Alpha %d.%d", versionMajor, versionMinor);
+                ImGui::EndMenu();
+            }
 
+            if(ImGui::BeginMenu("Author"))
+            {
+                ImGui::Text("AtmosEditor is developed by GBB in 2017.");
+                if(ImGui::ImageButton((ImTextureID) (uintptr_t) logoButtonID, ImVec2(200, 200)))
+                    a3Log::debug("And I guess no one would notice this passage.\n");
+                ImGui::EndMenu();
+            }
             ImGui::EndMenu();
         }
 
@@ -919,8 +937,11 @@ void ofApp::cameraWindow()
             // active camera to preview
             if(ImGui::Checkbox(generateLabel("Active", c->name).c_str(), &c->active))
             {
-                // 被激活摄像机索引
-                activeCameraIndex = it - cameraList.begin();
+                if(c->active)
+                    // 被激活摄像机索引
+                    activeCameraIndex = it - cameraList.begin();
+                else
+                    activeCameraIndex = -1;
             }
 
             if(ImGui::DragFloat("Width", &c->dimension[0], 1.0f, 1.0f, 1920.0f))
@@ -961,7 +982,10 @@ void ofApp::cameraWindow()
             }
 
             // 视锥体距离
-            ImGui::DragFloat(generateLabel("Distance", c->name).c_str(), &c->distance);
+            ImGui::DragFloat(generateLabel("Focal Length", c->name).c_str(), &c->distance, 1.0f, 0.0f, 1000.0f);
+
+            // 透镜半径
+            ImGui::DragFloat(generateLabel("Lens Radius", c->name).c_str(), &c->lensRadius, 1.0f, 0.0f, 1000.0f);
 
             IMGUI_BUTTON_DELETE_BEGIN("Camera" + c->name)
                 a3EditorCameraData* temp = *it;
@@ -1010,12 +1034,17 @@ void ofApp::cameraWindow()
             if(!find)
             {
                 ofCamera* camera = new ofCamera();
-                // 左手系
-                //camera->setVFlip(true);
+                camera->setupPerspective(false, 40, 0.001, 100000.0f);
                 camera->lookAt(ofVec3f(0, 0, 1), ofVec3f(0, 1, 0));
 
                 //ofEasyCam* camera = new ofEasyCam();
                 a3EditorCameraData* data = new a3EditorCameraData(camera, buffer);
+                // 默认启动第一个激活
+                if(cameraList.size() == 0)
+                {
+                    data->active = true;
+                    activeCameraIndex = 0;
+                }
                 cameraList.push_back(data);
             }
             else

@@ -33,15 +33,15 @@ void a3EditorCameraData::draw()
     // ±¾Ìå
     camera->transformGL();
 
-    //ofPushMatrix();
+    ofPushMatrix();
     if(active)
         ofSetColor(20, 210, 20);
     else
         ofSetColor(255);
 
-    //ofScale(1, 1, 1);
+    ofScale(1, 1, 1);
     ofNode().draw();
-    //ofPopMatrix();
+    ofPopMatrix();
 
     camera->restoreTransformGL();
 
@@ -79,7 +79,7 @@ void a3EditorCameraData::draw()
 }
 
 a3EditorModelData::a3EditorModelData(ofxAssimpModelLoader * loader, string modelPath, string name)
-    :model(loader), name(name), materialIndex(-1)
+    :model(loader), name(name), materialIndex(-1), drawFaces(false)
 {
     if(modelPath.length() <= A3_ADDRESS_PATH_LENGTH)
         strcpy(path, modelPath.c_str());
