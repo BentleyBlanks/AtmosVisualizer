@@ -33,6 +33,7 @@ public:
     void gotMessage(ofMessage msg);
 
     void guiSetup();
+    void guiDock();
     void guiDraw();
     void debugDraw();
     void updateMQ();
@@ -58,11 +59,11 @@ public:
 
     // editor
     ofxImGui::Gui gui;
-    ImGuiDock::Dockspace dockspace;
-    ImGuiDock::Dock rendererDock, cameraDock, modelDock,
-                    sceneDock, previewDock, offlineResultDock,
-                    materialDock, textureDock, 
-                    shapeDock, lightDock;
+    //ImGuiDock::Dockspace dockspace;
+    //ImGuiDock::Dock rendererDock, cameraDock, modelDock,
+    //                sceneDock, previewDock, offlineResultDock,
+    //                materialDock, textureDock, 
+    //                shapeDock, lightDock;
 
     ofImage logo;
     GLuint logoButtonID;

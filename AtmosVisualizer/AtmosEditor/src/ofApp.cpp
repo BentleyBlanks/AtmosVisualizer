@@ -15,9 +15,9 @@ const int C2SMsgSize = sizeof(a3C2SGridBufferMessage);
 static int styleID = 0;
 #define IMGUI_STYLE_BEGIN(style)    static int tempStyleID = styleID++;\
                                     ImGui::PushID(tempStyleID);\
-                                    ImGui::PushStyleColor(ImGuiCol_Button, ImColor::HSV(style / 7.0f, 0.6f, 0.6f));\
-                                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImColor::HSV(style / 7.0f, 0.7f, 0.7f));\
-                                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImColor::HSV(style / 7.0f, 0.8f, 0.8f));
+                                    ImGui::PushStyleColor(ImGuiCol_Button, (ImVec4)ImColor::HSV(style / 7.0f, 0.6f, 0.6f));\
+                                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(style / 7.0f, 0.7f, 0.7f));\
+                                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(style / 7.0f, 0.8f, 0.8f));
 
 #define IMGUI_STYLE_END()           ImGui::PopStyleColor(3); \
                                     ImGui::PopID();
@@ -308,15 +308,33 @@ void ofApp::guiSetup()
     style->GrabRounding = 0.0f;
     style->ScrollbarRounding = 0.0f;
 
-    // left
-    rendererDock.initialize("Renderer", true, ImVec2(), [this](ImVec2 area) { rendererWindow(); });
+    // load the dock's layout
+    ImGui::LoadDock();
+}
 
-    cameraDock.initialize("Camera", true, ImVec2(), [this](ImVec2 area) { cameraWindow(); });
+void ofApp::guiDock()
+{
+    ImGui::BeginDockspace();
 
-    modelDock.initialize("Model", true, ImVec2(), [this](ImVec2 area) { modelWindow(); });
+    if(ImGui::BeginDock("Renderer"))
+    {
+        rendererWindow();
+    }
+    ImGui::EndDock();
 
-    // middle
-    sceneDock.initialize("Scene", true, ImVec2(), [this](ImVec2 area)
+    if(ImGui::BeginDock("Camera"))
+    {
+        cameraWindow();
+    }
+    ImGui::EndDock();
+
+    if(ImGui::BeginDock("Model"))
+    {
+        modelWindow();
+    }
+    ImGui::EndDock();
+
+    if(ImGui::BeginDock("Scene"))
     {
         freeCamPreview = true;
 
@@ -328,65 +346,70 @@ void ofApp::guiSetup()
 
         // realtime rendering preview
         ImGui::Image((ImTextureID) (uintptr_t) sceneFbo.getTexture().getTextureData().textureID, ImVec2(sceneFbo.getWidth(), sceneFbo.getHeight()));
-    });
+    }
+    ImGui::EndDock();
 
-    previewDock.initialize("Preview", true, ImVec2(), [this](ImVec2 area)
-    {
+    if(ImGui::BeginDock("Preview"))
+    {   
         // active camera preview 
         freeCamPreview = false;
 
         ofVec2f d(previewFbo.getWidth(), previewFbo.getHeight());
         if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+        {
             d = cameraList[activeCameraIndex]->dimension;
-        else return;
 
-        // reallocate
-        reallocateFbo(&previewFbo, d.x, d.y);
+            // reallocate
+            reallocateFbo(&previewFbo, d.x, d.y);
 
-        // realtime rendering preview
-        ImGui::Image((ImTextureID) (uintptr_t) previewFbo.getTexture().getTextureData().textureID, ImVec2(previewFbo.getWidth(), previewFbo.getHeight()));
-    });
+            // realtime rendering preview
+            ImGui::Image((ImTextureID) (uintptr_t) previewFbo.getTexture().getTextureData().textureID, ImVec2(previewFbo.getWidth(), previewFbo.getHeight()));
+        }
+    }
+    ImGui::EndDock();
 
-    offlineResultDock.initialize("Result", true, ImVec2(), [this](ImVec2 area)
+    if(ImGui::BeginDock("Result"))
     {
         // ipc renderer image
         ofVec2f d(ipcFbo.getWidth(), ipcFbo.getHeight());
         if(activeCameraIndex >= 0 && activeCameraIndex < cameraList.size())
+        {
             d = cameraList[activeCameraIndex]->dimension;
-        else return;
 
-        // reallocate
-        reallocateFbo(&ipcFbo, d.x, d.y);
+            // reallocate
+            reallocateFbo(&ipcFbo, d.x, d.y);
 
-        // realtime rendering preview
-        ImGui::Image((ImTextureID) (uintptr_t) ipcFbo.getTexture().getTextureData().textureID, ImVec2(ipcFbo.getWidth() , ipcFbo.getHeight()));
-    });
+            // realtime rendering preview
+            ImGui::Image((ImTextureID) (uintptr_t) ipcFbo.getTexture().getTextureData().textureID, ImVec2(ipcFbo.getWidth(), ipcFbo.getHeight()));
+        }
+    }
+    ImGui::EndDock();
 
-    // bottom
-    materialDock.initialize("Material", true, ImVec2(), [this](ImVec2 area) { materialWindow(); });
+    if(ImGui::BeginDock("Shape"))
+    {
+        shapeWindow();
+    }
+    ImGui::EndDock();
 
-    textureDock.initialize("Texture", true, ImVec2(), [this](ImVec2 area) { textureWindow(); });
+    if(ImGui::BeginDock("Light"))
+    {
+        lightWindow();
+    }
+    ImGui::EndDock();
 
-    // right
-    shapeDock.initialize("Shape", true, ImVec2(), [this](ImVec2 area) { shapeWindow(); });
+    if(ImGui::BeginDock("Material"))
+    {
+        materialWindow();
+    }
+    ImGui::EndDock();
 
-    lightDock.initialize("Light", true, ImVec2(), [this](ImVec2 area) { lightWindow(); });
+    if(ImGui::BeginDock("Texture"))
+    {
+        textureWindow();
+    }
+    ImGui::EndDock();
 
-    int width = ofGetWidth(), height = ofGetHeight();
-
-    dockspace.dock(&rendererDock, ImGuiDock::DockSlot::Left, 0.27 * width, true);
-    dockspace.dockWith(&sceneDock, &rendererDock, ImGuiDock::DockSlot::Right, 0.68 * width, false);
-    dockspace.dockWith(&previewDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
-    dockspace.dockWith(&offlineResultDock, &sceneDock, ImGuiDock::DockSlot::Tab, 0, false);
-
-    dockspace.dockWith(&cameraDock, &rendererDock, ImGuiDock::DockSlot::Bottom, 0.6 * height, true);
-    dockspace.dockWith(&modelDock, &cameraDock, ImGuiDock::DockSlot::Tab, 0, false);
-
-    dockspace.dock(&shapeDock, ImGuiDock::DockSlot::Right, 0.15 * width, false);
-    dockspace.dockWith(&lightDock, &shapeDock, ImGuiDock::DockSlot::Tab, 0, true);
-
-    dockspace.dockWith(&materialDock, &shapeDock, ImGuiDock::DockSlot::Bottom, 0.5 * height, true);
-    dockspace.dockWith(&textureDock, &materialDock, ImGuiDock::DockSlot::Tab, 0, false);
+    ImGui::EndDockspace();
 }
 
 //--------------------------------------------------------------
@@ -401,7 +424,10 @@ void ofApp::guiDraw()
         {
             if(ImGui::MenuItem("Open", NULL)) { /*--! in the future*/ }
 
-            if(ImGui::MenuItem("Save", NULL)) { /*--! in the future*/ }
+            if(ImGui::MenuItem("Save Layout", NULL))
+            {
+                ImGui::SaveDock();
+            }
 
             if(ImGui::MenuItem("Save As", NULL)) { /*--! in the future*/ }
 
@@ -501,8 +527,9 @@ void ofApp::guiDraw()
     ImGui::SetNextWindowPos(ImVec2(0.0f, menuHeight));
     ImGui::SetNextWindowSize(ImVec2(width, height - menuHeight));
 
+    bool open = true;
     ImGui::Begin("All UI Widgets", &openAllUI, ImVec2(), 1.0f, window_flags);
-    dockspace.updateAndDraw(ImGui::GetContentRegionAvail());
+    guiDock();
     ImGui::End();
 
     gui.end();

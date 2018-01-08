@@ -1,100 +1,33 @@
-// modified by BentleyJobs in 2017.5.16
+// based on https://github.com/nem0/LumixEngine/blob/master/external/imgui/imgui_dock.h
+// modified from https://bitbucket.org/duangle/liminal/src/tip/src/liminal/imgui_dock.h
+
 #pragma once
-#include <vector>
-#include <functional>
-#include <string>
-#include "imgui.h"
 
-class GuiWindow;
+// Forward declarations
+typedef int ImGuiWindowFlags;
+    
+typedef enum ImGuiDockSlot {
+    ImGuiDockSlot_Left,
+    ImGuiDockSlot_Right,
+    ImGuiDockSlot_Top,
+    ImGuiDockSlot_Bottom,
+    ImGuiDockSlot_Tab,
 
-namespace ImGuiDock
-{
-	enum class DockSlot { Left, Right, Top, Bottom, Tab, None };
-	
-	struct Dock;
-	class Dockspace;
+    ImGuiDockSlot_Float,
+    ImGuiDockSlot_None
+} ImGuiDockSlot;
 
-	struct Container
-	{
+namespace ImGui{
 
-    Container()
-    {
-      splits[0] = nullptr;
-      splits[1] = nullptr;
-    }
+IMGUI_API void BeginDockspace();
+IMGUI_API void EndDockspace();
+IMGUI_API void ShutdownDock();
+IMGUI_API void SetNextDock(ImGuiDockSlot slot);
+IMGUI_API bool BeginDock(const char* label, bool* opened = NULL, ImGuiWindowFlags extra_flags = 0);
+IMGUI_API void EndDock();
+IMGUI_API void SetDockActive();
+IMGUI_API void DockDebugWindow();
+IMGUI_API void SaveDock();
+IMGUI_API void LoadDock();
 
-    Container *splits[2];
-
-
-		Container *parent = nullptr;
-		Dock *activeDock = nullptr;
-		
-		std::vector<Dock*>docks;
-
-		bool verticalSplit = false;
-		bool alwaysAutoResize = true;
-		float size = 0;
-	};
-
-	struct Dock
-	{
-		Dock *initialize(const char *dtitle,  bool dcloseButton, ImVec2 dminSize, std::function<void(ImVec2)> ddrawFunction)
-		{
-			title = dtitle;
-			closeButton = dcloseButton;
-			minSize = dminSize;
-			drawFunction = ddrawFunction;
-			return this;
-		};
-
-		//Container *parent = nullptr;
-		Container *container = nullptr;
-		Dockspace *redockFrom = nullptr;
-		Dock *redockTo = nullptr;
-
-		const char *title;
-		DockSlot dockSlot = DockSlot::Tab;
-		DockSlot redockSlot = DockSlot::None;
-		bool closeButton = true;
-		bool undockable = false;
-		bool draging = false;
-		ImVec2 lastSize;
-		ImVec2 minSize;
-
-		std::function<void(ImVec2)> drawFunction;
-		std::function<bool(void)> onCloseFunction;
-	};
-		
-	class Dockspace
-	{
-	public:
-		Dockspace();
-		~Dockspace();
-
-		bool dock(Dock *dock, DockSlot dockSlot, float size = 0, bool active = false);
-		bool dockWith(Dock *dock, Dock *dockTo, DockSlot dockSlot, float size = 0, bool active = false);
-		bool undock(Dock *dock);
-		
-		void updateAndDraw(ImVec2 size);
-		void clear();
-
-		std::vector<Dock*>m_docks;
-
-		Container m_container;
-		std::vector<Container*>m_containers;
-
-	protected:
-
-
-		void _renderTabBar(Container *container, ImVec2 size, ImVec2 cursorPos);
-		bool _getMinSize(Container *container, ImVec2 *min);
-
-		enum DockToAction
-		{
-			eUndock, eDrag, eClose, eNull
-		};
-
-		Dock *m_currentDockTo = nullptr;
-		DockToAction m_currentDockToAction = eNull;
-	};
 };

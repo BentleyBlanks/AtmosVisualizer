@@ -413,7 +413,7 @@ namespace ofxImGui
 		// Build texture atlas
 		ImGuiIO& io = ImGui::GetIO();
 
-        io.Fonts->AddFontFromFileTTF("./data/msyhl.ttc", 19, NULL, io.Fonts->GetGlyphRangesChinese());
+        io.Fonts->AddFontFromFileTTF("./data/msyh.ttc", 17);
 
 		unsigned char* pixels;
 		int width, height;
